@@ -1,17 +1,12 @@
 {
-  "name": "ac6c-hp-calculator",
+  "name": "ac6c-calculator-worker",
   "version": "1.0.0",
-  "description": "AC6C Tune Calculator - servidor Express",
-  "main": "server.js",
+  "private": true,
   "scripts": {
-    "start": "node server.js",
-    "build": "echo \"static site, no build step needed\"",
-    "deploy": "echo \"nothing to deploy, server.js serves /public directly\""
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "express": "^4.19.2"
+  "devDependencies": {
+    "wrangler": "^3.90.0"
   }
 }
