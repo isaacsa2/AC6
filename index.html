@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AC6C — Calculadora de Tune</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #181b25; --surface2: #1f2333;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0; --text2: #8b90a0; --text3: #555a6a;
+    --blue: #4a8fff; --blue-dim: rgba(74,143,255,0.12);
+    --amber: #f5a623; --amber-dim: rgba(245,166,35,0.12);
+    --green: #3ecf8e; --green-dim: rgba(62,207,142,0.1);
+    --purple: #a78bfa; --purple-dim: rgba(167,139,250,0.1);
+    --mono: 'JetBrains Mono', monospace; --sans: 'Inter', sans-serif;
+  }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem; line-height: 1.6; }
+  .shell { max-width: 860px; margin: 0 auto; }
+  header { display: flex; align-items: flex-end; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  .logo-mark { width: 44px; height: 44px; border-radius: 10px; background: var(--blue-dim); border: 1px solid rgba(74,143,255,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo-mark svg { width: 22px; height: 22px; }
+  header h1 { font-size: 1.15rem; font-weight: 600; color: var(--text); line-height: 1.2; }
+  header p { font-size: 0.78rem; color: var(--text3); font-family: var(--mono); margin-top: 2px; }
+
+  .section-label {
+    font-size: 0.68rem; font-weight: 500; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .1em;
+    margin: 1.5rem 0 0.75rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 620px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .card-title { font-size: 0.68rem; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1rem; }
+  .field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .field-group3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 0.72rem; color: var(--text2); font-family: var(--mono); }
+  .field input[type="number"] {
+    background: var(--bg); border: 1px solid var(--border2); border-radius: 7px;
+    color: var(--text); font-family: var(--mono); font-size: 0.88rem;
+    padding: 7px 10px; width: 100%; outline: none; transition: border-color .15s;
+    -moz-appearance: textfield;
+  }
+  .field input[type="number"]::-webkit-outer-spin-button,
+  .field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .field input[type="number"]:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(74,143,255,0.1); }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
+  .toggle-label { font-size: 0.8rem; color: var(--text2); display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-sw { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border2); border-radius: 20px; cursor: pointer; transition: background .2s, border-color .2s; }
+  .slider-sw::before { content: ''; position: absolute; width: 12px; height: 12px; left: 3px; top: 3px; background: var(--text3); border-radius: 50%; transition: transform .2s, background .2s; }
+  .switch input:checked + .slider-sw { background: var(--blue-dim); border-color: var(--blue); }
+  .switch input:checked + .slider-sw::before { transform: translateX(16px); background: var(--blue); }
+  .pill { font-size: 0.65rem; font-family: var(--mono); font-weight: 500; padding: 2px 8px; border-radius: 20px; letter-spacing: .05em; }
+  .pill-on  { background: rgba(62,207,142,0.12); color: var(--green);  border: 1px solid rgba(62,207,142,0.2); }
+  .pill-off { background: var(--surface2); color: var(--text3); border: 1px solid var(--border); }
+  .sub-fields { margin-top: 0.75rem; }
+
+  .results-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin: 1rem 0; }
+  @media (max-width: 620px) { .results-row { grid-template-columns: repeat(2, 1fr); } }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; }
+  .metric .lbl { font-size: 0.65rem; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .metric .val { font-size: 1.5rem; font-weight: 600; font-family: var(--mono); line-height: 1; }
+  .metric .sub { font-size: 0.65rem; color: var(--text3); margin-top: 5px; font-family: var(--mono); }
+  .col-na { color: var(--text2); } .col-turbo { color: var(--blue); } .col-super { color: var(--amber); } .col-total { color: var(--green); }
+  .metric.metric-total { border-color: rgba(62,207,142,0.2); background: rgba(62,207,142,0.04); }
+
+  .sus-results { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.75rem; margin: 1rem 0; }
+  @media (max-width: 620px) { .sus-results { grid-template-columns: 1fr 1fr; } }
+  .metric-purple .val { color: var(--purple); }
+  .metric-purple { border-color: rgba(167,139,250,0.15); }
+
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: var(--text2); font-family: var(--mono); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .chart-wrap { position: relative; width: 100%; height: 220px; }
+
+  .formula-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0; margin-bottom: 1rem; overflow: hidden; }
+  .formula-card pre { font-family: var(--mono); font-size: 0.78rem; color: var(--text2); line-height: 1.9; white-space: pre-wrap; word-break: break-word; padding: 0 1.25rem 1.25rem; margin: 0; }
+
+  .formula-toggle {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    background: none; border: none; cursor: pointer; padding: 1.25rem; text-align: left;
+    font-family: inherit; color: inherit;
+  }
+  .formula-toggle .card-title { margin: 0; }
+  .formula-toggle .chev { width: 14px; height: 14px; flex-shrink: 0; transition: transform .2s; color: var(--text3); }
+  .formula-card.open .formula-toggle .chev { transform: rotate(180deg); }
+  .formula-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+  .formula-card.open .formula-body { max-height: 1400px; }
+
+  .tab-bar { display: flex; gap: 4px; margin: 1.5rem 0 1rem; flex-wrap: wrap; }
+  .tab-btn {
+    font-family: var(--mono); font-size: 0.72rem; padding: 7px 14px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text2);
+    cursor: pointer; transition: all .15s; letter-spacing: .03em;
+  }
+  .tab-btn:hover { color: var(--text); border-color: var(--border2); }
+  .tab-btn.active { background: var(--blue-dim); border-color: rgba(74,143,255,0.3); color: var(--blue); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .table-mini { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.78rem; margin-top: 0.75rem; }
+  .table-mini th { text-align: left; color: var(--text3); font-size: 0.65rem; text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-bottom: 1px solid var(--border2); }
+  .table-mini td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  .table-mini tr:last-child td { border-bottom: none; }
+  .table-mini td.num { color: var(--text); text-align: right; }
+  .table-mini td.flag-ok { color: var(--green); text-align: right; }
+  .table-mini td.flag-bad { color: #f05252; text-align: right; }
+
+  footer { text-align: center; font-size: 0.68rem; color: var(--text3); font-family: var(--mono); padding-top: 1.5rem; border-top: 1px solid var(--border); margin-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4a8fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <div>
+      <h1>AC6C — Calculadora de Tune</h1>
+      <p>Engine · Forced Induction · Weight · Suspension · isaacsa2</p>
+    </div>
+  </header>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="engine">Motor</button>
+    <button class="tab-btn" data-tab="weight">Peso &amp; Suspensão</button>
+    <button class="tab-btn" data-tab="drivetrain">Drivetrain</button>
+    <button class="tab-btn" data-tab="brakes">Freios</button>
+    <button class="tab-btn" data-tab="steering">Direção</button>
+  </div>
+
+  <div class="tab-panel active" data-panel="engine">
+  <!-- ── ENGINE ── -->
+  <div class="section-label">Motor (Engine)</div>
+  <div class="grid2" style="margin-bottom:0.75rem;">
+    <div class="card">
+      <p class="card-title">Parâmetros base</p>
+      <div class="field-group">
+        <div class="field"><label>Horsepower (NA)</label><input type="number" id="hp" value="218" min="1" max="9999"></div>
+        <div class="field"><label>PeakRPM</label><input type="number" id="peakrpm" value="6400" min="100" max="20000"></div>
+        <div class="field"><label>Redline</label><input type="number" id="redline" value="6800" min="100" max="20000"></div>
+        <div class="field"><label>CompressionRatio</label><input type="number" id="cr" value="8.5" min="1" max="20" step="0.1"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="card">
+        <p class="card-title">Turbocharger</p>
+        <div class="toggle-row">
+          <label class="toggle-label">
+            <label class="switch"><input type="checkbox" id="turbo-en" checked><span class="slider-sw"></span></label>
+            Ativar turbo
+          </label>
+          <span class="pill pill-on" id="turbo-pill">ON</span>
+        </div>
+        <div class="sub-fields field-group">
+          <div class="field"><label>Turbochargers</label><input type="number" id="tcount" value="1" min="0" max="4"></div>
+          <div class="field"><label>T_Boost (PSI)</label><input type="number" id="tboost" value="6" min="0" max="60" step="0.5"></div>
+        </div>
+      </div>
+      <div class="card">
+        <p class="card-title">Supercharger</p>
+        <div class="toggle-row">
+          <label class="toggle-label">
+            <label class="switch"><input type="checkbox" id="super-en"><span class="slider-sw"></span></label>
+            Ativar supercharger
+          </label>
+          <span class="pill pill-off" id="super-pill">OFF</span>
+        </div>
+        <div class="sub-fields field-group">
+          <div class="field"><label>Superchargers</label><input type="number" id="scount" value="1" min="0" max="4"></div>
+          <div class="field"><label>S_Boost (PSI)</label><input type="number" id="sboost" value="6" min="0" max="60" step="0.5"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="results-row">
+    <div class="metric"><p class="lbl">HP Atmosférico</p><p class="val col-na" id="r-na">218</p><p class="sub">base NA</p></div>
+    <div class="metric"><p class="lbl">HP Turbo (máx)</p><p class="val col-turbo" id="r-turbo">+74</p><p class="sub" id="r-turbo-sub">1× @ 6 PSI</p></div>
+    <div class="metric"><p class="lbl">HP Super (máx)</p><p class="val col-super" id="r-super">+0</p><p class="sub" id="r-super-sub">desativado</p></div>
+    <div class="metric metric-total"><p class="lbl">HP Total</p><p class="val col-total" id="r-total">292</p><p class="sub">boost pleno</p></div>
+  </div>
+
+  <div class="section-label" style="margin-top:0.5rem;">Motor vs Peso</div>
+
+  <div class="sus-results" id="pw-row" style="grid-template-columns:repeat(3,1fr);">
+    <div class="metric metric-purple"><p class="lbl">HP / tonelada</p><p class="val" id="pw-hppt">—</p><p class="sub">hp/t (métrico)</p></div>
+    <div class="metric metric-purple"><p class="lbl">Razão potência/peso</p><p class="val" id="pw-ratio">—</p><p class="sub">HP ÷ peso (lbs)</p></div>
+    <div class="metric metric-purple"><p class="lbl">0–60 mph estimado</p><p class="val" id="pw-060">—</p><p class="sub">aprox. teórico</p></div>
+    <div class="metric metric-purple"><p class="lbl">Torque mín. p/ mover</p><p class="val" id="pw-tqmin">—</p><p class="sub">resistência estática</p></div>
+    <div class="metric metric-purple"><p class="lbl">Aceleração máx.</p><p class="val" id="pw-accel">—</p><p class="sub">g (gravidade)</p></div>
+    <div class="metric" id="pw-verdict-card" style="border-color:rgba(62,207,142,0.2);background:rgba(62,207,142,0.04);">
+      <p class="lbl">Veredito</p>
+      <p class="val" id="pw-verdict" style="font-size:1rem;color:var(--green);">—</p>
+      <p class="sub" id="pw-verdict-sub"></p>
+    </div>
+  </div>
+
+  <div class="formula-card" data-collapsible style="margin-bottom:1rem;">
+    <button class="formula-toggle">
+      <p class="card-title">Cálculos Motor vs Peso</p>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="formula-body"><pre id="pw-formula-text"></pre></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <p class="card-title" style="margin:0;">Curva HP vs RPM</p>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#555a6a;"></span>NA</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#4a8fff;"></span>NA + Turbo</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#f5a623;border-radius:0;"></span>NA + Super</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#3ecf8e;"></span>Total</span>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="hpChart" role="img" aria-label="Curva HP vs RPM">Curva de potência em função do RPM.</canvas>
+    </div>
+  </div>
+
+  <div class="formula-card" data-collapsible style="margin-bottom:0;">
+    <button class="formula-toggle">
+      <p class="card-title">Fórmula HP em tempo real</p>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="formula-body"><pre id="formula-text"></pre></div>
+  </div>
+  </div><!-- /panel engine -->
+
+  <div class="tab-panel" data-panel="weight">
+  <div class="section-label" style="margin-top:2rem;">Peso e Suspensão</div>
+
+  <div class="grid2" style="margin-bottom:0.75rem;">
+    <div class="card">
+      <p class="card-title">Peso (Weight)</p>
+      <div class="field-group">
+        <div class="field"><label>Weight (lbs)</label><input type="number" id="weight" value="5200" min="100" max="99999"></div>
+        <div class="field"><label>WeightDist (%)</label><input type="number" id="wdist" value="55" min="0" max="100"></div>
+        <div class="field"><label>CGHeight (studs)</label><input type="number" id="cgh" value="1.4" min="0" max="10" step="0.1"></div>
+        <div class="field"><label>FWheelDensity</label><input type="number" id="fwd" value="0.2" min="0.01" max="5" step="0.01"></div>
+        <div class="field"><label>RWheelDensity</label><input type="number" id="rwd" value="0.2" min="0.01" max="5" step="0.01"></div>
+        <div class="field"><label>AxleDensity</label><input type="number" id="axd" value="0.1" min="0.01" max="5" step="0.01"></div>
+      </div>
+    </div>
+    <div class="card">
+      <p class="card-title">Suspensão dianteira</p>
+      <div class="field-group">
+        <div class="field"><label>FSusStiffness</label><input type="number" id="fstiff" value="16000" min="100" max="999999"></div>
+        <div class="field"><label>FSusDamping</label><input type="number" id="fdamp" value="300" min="1" max="9999"></div>
+        <div class="field"><label>FSusLength (studs)</label><input type="number" id="flen" value="2" min="0.1" max="20" step="0.1"></div>
+        <div class="field"><label>FPreCompress</label><input type="number" id="fprecomp" value="0.6" min="0" max="5" step="0.1"></div>
+        <div class="field"><label>FExtensionLim</label><input type="number" id="fext" value="0.4" min="0" max="5" step="0.05"></div>
+        <div class="field"><label>FCompressLim</label><input type="number" id="fcomp" value="0.1" min="0" max="5" step="0.05"></div>
+      </div>
+      <p class="card-title" style="margin-top:1rem;">Suspensão traseira</p>
+      <div class="field-group">
+        <div class="field"><label>RSusStiffness</label><input type="number" id="rstiff" value="16000" min="100" max="999999"></div>
+        <div class="field"><label>RSusDamping</label><input type="number" id="rdamp" value="300" min="1" max="9999"></div>
+        <div class="field"><label>RSusLength (studs)</label><input type="number" id="rlen" value="2" min="0.1" max="20" step="0.1"></div>
+        <div class="field"><label>RPreCompress</label><input type="number" id="rprecomp" value="0.6" min="0" max="5" step="0.1"></div>
+        <div class="field"><label>RExtensionLim</label><input type="number" id="rext" value="0.4" min="0" max="5" step="0.05"></div>
+        <div class="field"><label>RCompressLim</label><input type="number" id="rcomp" value="0.1" min="0" max="5" step="0.05"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sus-results">
+    <div class="metric metric-purple"><p class="lbl">Peso dianteiro</p><p class="val" id="s-wf">2860 lbs</p><p class="sub" id="s-wf-sub">55% frontal</p></div>
+    <div class="metric metric-purple"><p class="lbl">Peso traseiro</p><p class="val" id="s-wr">2340 lbs</p><p class="sub" id="s-wr-sub">45% traseiro</p></div>
+    <div class="metric metric-purple"><p class="lbl">Peso total (kg)</p><p class="val" id="s-wkg">2359 kg</p><p class="sub">lbs ÷ 2.205</p></div>
+    <div class="metric metric-purple"><p class="lbl">F stiffness mínimo</p><p class="val" id="s-fmin">—</p><p class="sub">suporte estático</p></div>
+    <div class="metric metric-purple"><p class="lbl">R stiffness mínimo</p><p class="val" id="s-rmin">—</p><p class="sub">suporte estático</p></div>
+    <div class="metric metric-purple"><p class="lbl">Damping crítico F</p><p class="val" id="s-fdcrit">—</p><p class="sub">coef. amortecimento</p></div>
+  </div>
+
+  <div class="formula-card" data-collapsible>
+    <button class="formula-toggle">
+      <p class="card-title">Cálculos de suspensão</p>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="formula-body"><pre id="sus-formula-text"></pre></div>
+  </div>
+  </div><!-- /panel weight -->
+
+  <div class="tab-panel" data-panel="drivetrain">
+    <div class="section-label">Drivetrain — Marchas &amp; Final Drive</div>
+    <div class="grid2" style="margin-bottom:0.75rem;">
+      <div class="card">
+        <p class="card-title">Parâmetros</p>
+        <div class="field-group">
+          <div class="field"><label>FinalDrive</label><input type="number" id="dt-finaldrive" value="3.42" min="0.5" max="20" step="0.01"></div>
+          <div class="field"><label>FDMult</label><input type="number" id="dt-fdmult" value="1" min="0.1" max="10" step="0.01"></div>
+          <div class="field"><label>Redline (RPM)</label><input type="number" id="dt-redline" value="6800" min="100" max="20000"></div>
+          <div class="field" style="grid-column:1/-1;">
+            <label>Size da roda no Roblox (X, Y, Z studs)</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+              <input type="number" id="dt-wdia-x" value="4.596" min="0.1" max="20" step="0.001" placeholder="X">
+              <input type="number" id="dt-wdia-y" value="4.656" min="0.1" max="20" step="0.001" placeholder="Y">
+              <input type="number" id="dt-wdia-z" value="4.656" min="0.1" max="20" step="0.001" placeholder="Z">
+            </div>
+            <p style="font-size:0.65rem;color:var(--text3);font-family:var(--mono);margin-top:4px;">Diâmetro usado = eixo X (v.Size.x no Drive.lua)</p>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <p class="card-title">Relações de marcha (Ratios), separadas por vírgula</p>
+        <div class="field" style="grid-column:1/-1;">
+          <label>Ex: 1ª, 2ª, 3ª, 4ª, 5ª, 6ª</label>
+          <input type="text" id="dt-ratios" value="3.36, 2.07, 1.36, 1.03, 0.82, 0.65" style="background:var(--bg);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:0.85rem;padding:7px 10px;width:100%;outline:none;">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem;">
+      <p class="card-title">Velocidade máxima teórica por marcha (na redline)</p>
+      <table class="table-mini" id="dt-table"><thead><tr><th>Marcha</th><th>Ratio</th><th>Vel. máx (mph)</th><th>Vel. máx (km/h)</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="formula-card" data-collapsible>
+      <button class="formula-toggle">
+        <p class="card-title">Cálculos de drivetrain</p>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="formula-body"><pre id="dt-formula-text"></pre></div>
+    </div>
+  </div><!-- /panel drivetrain -->
+
+  <div class="tab-panel" data-panel="brakes">
+    <div class="section-label">Freios — Força vs Peso</div>
+    <div class="grid2" style="margin-bottom:0.75rem;">
+      <div class="card">
+        <p class="card-title">Parâmetros</p>
+        <div class="field-group">
+          <div class="field"><label>BrakeForce (total)</label><input type="number" id="bk-force" value="3000" min="100" max="999999"></div>
+          <div class="field"><label>BrakeBias (% frente)</label><input type="number" id="bk-bias" value="60" min="0" max="100"></div>
+          <div class="field"><label>Peso (lbs)</label><input type="number" id="bk-weight" value="5200" min="100" max="99999"></div>
+          <div class="field"><label>Velocidade inicial (mph)</label><input type="number" id="bk-speed" value="60" min="1" max="400"></div>
+        </div>
+      </div>
+      <div class="card">
+        <p class="card-title">Coeficiente de atrito (pneu/asfalto)</p>
+        <div class="field-group">
+          <div class="field"><label>µ (atrito)</label><input type="number" id="bk-mu" value="0.9" min="0.1" max="2" step="0.05"></div>
+          <div class="field"><label>EBrakeForce (engine brake)</label><input type="number" id="bk-eforce" value="500" min="0" max="99999"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="results-row" style="grid-template-columns:repeat(3,1fr);">
+      <div class="metric metric-purple"><p class="lbl">Força dianteira</p><p class="val" id="bk-ffront">—</p><p class="sub">BrakeForce × Bias</p></div>
+      <div class="metric metric-purple"><p class="lbl">Força traseira</p><p class="val" id="bk-frear">—</p><p class="sub">BrakeForce × (1-Bias)</p></div>
+      <div class="metric" id="bk-verdict-card" style="border-color:rgba(62,207,142,0.2);background:rgba(62,207,142,0.04);"><p class="lbl">Distância de frenagem</p><p class="val" id="bk-dist" style="color:var(--green);">—</p><p class="sub" id="bk-dist-sub"></p></div>
+    </div>
+
+    <div class="formula-card" data-collapsible>
+      <button class="formula-toggle">
+        <p class="card-title">Cálculos de frenagem</p>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="formula-body"><pre id="bk-formula-text"></pre></div>
+    </div>
+  </div><!-- /panel brakes -->
+
+  <div class="tab-panel" data-panel="steering">
+    <div class="section-label">Direção — Ackerman &amp; Esterço</div>
+    <div class="grid2" style="margin-bottom:0.75rem;">
+      <div class="card">
+        <p class="card-title">Parâmetros (modo New)</p>
+        <div class="field-group">
+          <div class="field"><label>LockToLock (voltas)</label><input type="number" id="st-locktolock" value="2.6" min="0.1" max="10" step="0.1"></div>
+          <div class="field"><label>SteerRatio</label><input type="number" id="st-ratio" value="14" min="1" max="40" step="0.1"></div>
+          <div class="field"><label>Ackerman (%)</label><input type="number" id="st-ackerman" value="100" min="0" max="200"></div>
+        </div>
+      </div>
+      <div class="card">
+        <p class="card-title">Eixo (para raio de giro)</p>
+        <div class="field-group">
+          <div class="field"><label>Wheelbase (studs)</label><input type="number" id="st-wheelbase" value="9" min="1" max="50" step="0.1"></div>
+          <div class="field"><label>Track width (studs)</label><input type="number" id="st-track" value="5.5" min="1" max="30" step="0.1"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="results-row" style="grid-template-columns:repeat(3,1fr);">
+      <div class="metric metric-purple"><p class="lbl">SteerOuter</p><p class="val" id="st-outer">—</p><p class="sub">ângulo roda externa</p></div>
+      <div class="metric metric-purple"><p class="lbl">SteerInner</p><p class="val" id="st-inner">—</p><p class="sub">ângulo roda interna</p></div>
+      <div class="metric metric-purple"><p class="lbl">Raio de giro</p><p class="val" id="st-radius">—</p><p class="sub">estimado, studs</p></div>
+    </div>
+
+    <div class="formula-card" data-collapsible>
+      <button class="formula-toggle">
+        <p class="card-title">Cálculos de esterço</p>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="formula-body"><pre id="st-formula-text"></pre></div>
+    </div>
+  </div><!-- /panel steering -->
+
+  <footer>AC6C Tune Calculator · isaacsa2 · fórmulas extraídas do Drive.lua</footer>
+</div>
+
+<script>
+  function v(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+  function curveN(RPM, hp, peak, sharp, curveMult) {
+    if (RPM <= 0 || peak <= 0 || hp <= 0) return 0;
+    var r = RPM / 1000, p = peak / 1000, H = hp / 100;
+    if (H <= 0) return 0;
+    return (-(r-p)*(r-p)) * Math.min(H/Math.pow(p,2), Math.pow(curveMult, p/H)) + H
+      * (r - (Math.pow(r, sharp) / (sharp * Math.pow(p, sharp-1))));
+  }
+
+  function curveNfull(RPM, hp, peak, sharp, curveMult) {
+    if (RPM <= 0 || peak <= 0 || hp <= 0) return 0;
+    var r = RPM / 1000, p = peak / 1000, H = hp / 100;
+    if (H <= 0) return 0;
+    var base = (-(r-p)*(r-p)) * Math.min(H/Math.pow(p,2), Math.pow(curveMult, p/H)) + H;
+    return base * (r - (Math.pow(r, sharp) / (sharp * Math.pow(p, sharp-1))));
+  }
+
+  function calcHP() {
+    var hp      = v('hp'), peak = v('peakrpm'), redline = v('redline'), cr = v('cr');
+    var turboEn = document.getElementById('turbo-en').checked;
+    var tcount  = turboEn ? v('tcount') : 0;
+    var tboost  = turboEn ? v('tboost') : 0;
+    var superEn = document.getElementById('super-en').checked;
+    var scount  = superEn ? v('scount') : 0;
+    var sboost  = superEn ? v('sboost') : 0;
+    var sharp = 6.5, curveMult = 0.2;
+
+    var TPsi = tboost * tcount;
+    var SPsi = sboost * scount;
+    var HP_T_coef = ((hp * TPsi * (cr/10) / 7.5) / 2) / 100;
+    var HP_S_coef = ((hp * SPsi * (cr/10) / 7.5) / 2) / 100;
+    var HP_T_max  = HP_T_coef * 100;
+    var HP_S_max  = HP_S_coef * 100;
+
+    var peakNA = Math.max(0.0001, curveNfull(peak, hp, peak, sharp, curveMult));
+
+    document.getElementById('r-na').textContent    = Math.round(hp);
+    document.getElementById('r-turbo').textContent = (turboEn && tcount > 0) ? '+' + Math.round(HP_T_max) : '+0';
+    document.getElementById('r-turbo-sub').textContent = (turboEn && tcount > 0) ? tcount + '× @ ' + tboost + ' PSI' : 'desativado';
+    document.getElementById('r-super').textContent = (superEn && scount > 0)  ? '+' + Math.round(HP_S_max) : '+0';
+    document.getElementById('r-super-sub').textContent = (superEn && scount > 0) ? scount + '× @ ' + sboost + ' PSI' : 'desativado';
+    document.getElementById('r-total').textContent = Math.round(hp + HP_T_max + HP_S_max);
+
+    var fText = 'HP_NA  = ' + Math.round(hp) + ' HP  (base atmosférico)\n';
+    if (turboEn && tcount > 0)
+      fText += 'HP_T   = (' + hp + ' x (' + tboost + ' x ' + tcount + ') x (' + cr + '/10) / 7.5) / 2 / 100\n'
+             + '       = ' + HP_T_coef.toFixed(4) + '  ->  ' + Math.round(HP_T_max) + ' HP max (boost pleno)\n';
+    else fText += 'HP_T   = 0 HP  (turbo desativado)\n';
+    if (superEn && scount > 0)
+      fText += 'HP_S   = (' + hp + ' x (' + sboost + ' x ' + scount + ') x (' + cr + '/10) / 7.5) / 2 / 100\n'
+             + '       = ' + HP_S_coef.toFixed(4) + '  ->  ' + Math.round(HP_S_max) + ' HP max\n';
+    else fText += 'HP_S   = 0 HP  (supercharger desativado)\n';
+    fText += '---------------------------------------------\n'
+           + 'TOTAL  = ' + Math.round(hp) + ' + ' + Math.round(HP_T_max) + ' + ' + Math.round(HP_S_max)
+           + ' = ' + Math.round(hp + HP_T_max + HP_S_max) + ' HP';
+    document.getElementById('formula-text').textContent = fText;
+
+    var steps = 80, labels = [], datNA = [], datT = [], datS = [], datTot = [];
+    for (var i = 0; i <= steps; i++) {
+      var rpm = (redline * i) / steps;
+      labels.push(Math.round(rpm));
+      var na_raw = Math.max(0, curveNfull(rpm, hp, peak, sharp, curveMult));
+      var naHP   = (na_raw / peakNA) * hp;
+      var t_raw  = Math.max(0, curveNfull(rpm, Math.max(1, HP_T_coef * 100), peak, sharp, curveMult));
+      var tHP    = (turboEn && tcount > 0) ? (t_raw / peakNA) * HP_T_max : 0;
+      var s_raw  = Math.max(0, curveNfull(rpm, Math.max(1, HP_S_coef * 100), peak, sharp, curveMult));
+      var sHP    = (superEn && scount > 0)  ? (s_raw / peakNA) * HP_S_max  : 0;
+      datNA.push(Math.max(0, Math.round(naHP * 10) / 10));
+      datT.push(Math.max(0, Math.round((naHP + tHP) * 10) / 10));
+      datS.push(Math.max(0, Math.round((naHP + sHP) * 10) / 10));
+      datTot.push(Math.max(0, Math.round((naHP + tHP + sHP) * 10) / 10));
+    }
+
+    if (window._hpChart) {
+      window._hpChart.data.labels = labels;
+      window._hpChart.data.datasets[0].data = datNA;
+      window._hpChart.data.datasets[1].data = datT;
+      window._hpChart.data.datasets[2].data = datS;
+      window._hpChart.data.datasets[3].data = datTot;
+      window._hpChart.update('none');
+    } else {
+      window._hpChart = new Chart(document.getElementById('hpChart'), {
+        type: 'line',
+        data: { labels: labels, datasets: [
+          { label:'NA',       data:datNA,  borderColor:'#555a6a', borderWidth:1.5, pointRadius:0, fill:false, tension:0.4 },
+          { label:'NA+Turbo',data:datT,   borderColor:'#4a8fff', borderWidth:2,   pointRadius:0, fill:false, tension:0.4 },
+          { label:'NA+Super',data:datS,   borderColor:'#f5a623', borderWidth:1.5, borderDash:[5,3], pointRadius:0, fill:false, tension:0.4 },
+          { label:'Total',   data:datTot, borderColor:'#3ecf8e', borderWidth:2.5, pointRadius:0, fill:false, tension:0.4 }
+        ]},
+        options: {
+          responsive:true, maintainAspectRatio:false, animation:{duration:0},
+          plugins:{ legend:{display:false}, tooltip:{
+            backgroundColor:'#181b25', borderColor:'rgba(255,255,255,0.1)', borderWidth:1,
+            titleColor:'#8b90a0', bodyColor:'#e8eaf0',
+            titleFont:{family:"'JetBrains Mono',monospace",size:11},
+            bodyFont:{family:"'JetBrains Mono',monospace",size:12},
+            callbacks:{ title:function(it){return it[0].label+' RPM';}, label:function(ctx){return ctx.dataset.label+': '+ctx.parsed.y.toFixed(0)+' HP';} }
+          }},
+          scales:{
+            x:{ ticks:{font:{family:"'JetBrains Mono',monospace",size:10},color:'#555a6a',callback:function(val,i){return i%16===0?Math.round(labels[i]):'';},maxRotation:0,autoSkip:false}, grid:{color:'rgba(255,255,255,0.04)'} },
+            y:{ ticks:{font:{family:"'JetBrains Mono',monospace",size:10},color:'#555a6a',callback:function(v){return v+' HP';}}, grid:{color:'rgba(255,255,255,0.04)'} }
+          }
+        }
+      });
+    }
+  }
+
+  function calcSus() {
+    var weight = v('weight');
+    var wdist  = v('wdist') / 100;
+    var cgh    = v('cgh');
+    var fstiff = v('fstiff'), fdamp = v('fdamp');
+    var flen   = v('flen'),   fprecomp = v('fprecomp');
+    var fext   = v('fext'),   fcomp = v('fcomp');
+    var rstiff = v('rstiff'), rdamp = v('rdamp');
+    var rlen   = v('rlen'),   rprecomp = v('rprecomp');
+    var rext   = v('rext'),   rcomp = v('rcomp');
+
+    var wF  = weight * wdist;
+    var wR  = weight * (1 - wdist);
+    var wKg = weight / 2.205;
+
+    var g = 32.2;
+    var fMinStiff = Math.round((wF * g) / Math.max(0.01, fprecomp + flen));
+    var rMinStiff = Math.round((wR * g) / Math.max(0.01, rprecomp + rlen));
+
+    var massF_slug = wF / g;
+    var fdCrit = Math.round(2 * Math.sqrt(fstiff * massF_slug));
+
+    document.getElementById('s-wf').textContent     = Math.round(wF) + ' lbs';
+    document.getElementById('s-wf-sub').textContent = Math.round(wdist*100) + '% frontal';
+    document.getElementById('s-wr').textContent     = Math.round(wR) + ' lbs';
+    document.getElementById('s-wr-sub').textContent = Math.round((1-wdist)*100) + '% traseiro';
+    document.getElementById('s-wkg').textContent    = Math.round(wKg) + ' kg';
+    document.getElementById('s-fmin').textContent   = fMinStiff.toLocaleString();
+    document.getElementById('s-rmin').textContent   = rMinStiff.toLocaleString();
+    document.getElementById('s-fdcrit').textContent = fdCrit.toLocaleString();
+
+    var txt = '';
+    txt += 'Peso dianteiro  = ' + weight + ' x ' + Math.round(wdist*100) + '% = ' + Math.round(wF) + ' lbs  (' + Math.round(wF/2.205) + ' kg)\n';
+    txt += 'Peso traseiro   = ' + weight + ' x ' + Math.round((1-wdist)*100) + '% = ' + Math.round(wR) + ' lbs  (' + Math.round(wR/2.205) + ' kg)\n';
+    txt += '\n';
+    txt += 'Stiffness minimo dianteiro (suportar peso estatico):\n';
+    txt += '  F_min = (WF x g) / (FPreCompress + FSusLength)\n';
+    txt += '        = (' + Math.round(wF) + ' x 32.2) / (' + fprecomp + ' + ' + flen + ') = ' + fMinStiff.toLocaleString() + '\n';
+    txt += '  Seu FSusStiffness = ' + fstiff.toLocaleString() + '  ' + (fstiff >= fMinStiff ? '  [OK - acima do minimo]' : '  [ATENCAO - abaixo do minimo]') + '\n';
+    txt += '\n';
+    txt += 'Stiffness minimo traseiro:\n';
+    txt += '  R_min = (' + Math.round(wR) + ' x 32.2) / (' + rprecomp + ' + ' + rlen + ') = ' + rMinStiff.toLocaleString() + '\n';
+    txt += '  Seu RSusStiffness = ' + rstiff.toLocaleString() + '  ' + (rstiff >= rMinStiff ? '  [OK - acima do minimo]' : '  [ATENCAO - abaixo do minimo]') + '\n';
+    txt += '\n';
+    txt += 'Damping critico dianteiro (amortecimento ideal):\n';
+    txt += '  Dc = 2 x sqrt(K x m)  onde m = WF / g = ' + Math.round(wF) + ' / 32.2 = ' + massF_slug.toFixed(2) + ' slugs\n';
+    txt += '     = 2 x sqrt(' + fstiff + ' x ' + massF_slug.toFixed(2) + ') = ' + fdCrit.toLocaleString() + '\n';
+    txt += '  Seu FSusDamping = ' + fdamp + '  (recomendado: 20-40% do critico = ' + Math.round(fdCrit*0.2) + ' a ' + Math.round(fdCrit*0.4) + ')';
+    document.getElementById('sus-formula-text').textContent = txt;
+  }
+
+  function calcPowerWeight() {
+    var hp      = v('hp');
+    var turboEn = document.getElementById('turbo-en').checked;
+    var tcount  = turboEn ? v('tcount') : 0;
+    var tboost  = turboEn ? v('tboost') : 0;
+    var superEn = document.getElementById('super-en').checked;
+    var scount  = superEn ? v('scount') : 0;
+    var sboost  = superEn ? v('sboost') : 0;
+    var cr      = v('cr');
+    var peak    = v('peakrpm');
+
+    var TPsi     = tboost * tcount;
+    var SPsi     = sboost * scount;
+    var HP_T_max = ((hp * TPsi * (cr/10) / 7.5) / 2);
+    var HP_S_max = ((hp * SPsi * (cr/10) / 7.5) / 2);
+    var hpTotal  = hp + HP_T_max + HP_S_max;
+
+    var weight  = v('weight');
+    var wKg     = weight / 2.205;
+    var wTon    = wKg / 1000;
+
+    var hpPerTon = hpTotal / Math.max(0.001, wTon);
+    var pwRatio  = hpTotal / Math.max(1, weight);
+
+    var rollingRes = weight * 0.015;
+    var tqMin = rollingRes * 1.0;
+    var tqPeak = (hpTotal * 5252) / Math.max(1, peak);
+
+    var fAtSpeed = (hpTotal * 550) / 88;
+    var mass = weight / 32.2;
+    var accelG = (fAtSpeed / mass) / 32.2;
+    var accelAvg = accelG * 0.60 * 32.2;
+    var t060 = 88 / Math.max(0.01, accelAvg);
+
+    var verdictText, verdictSub, verdictColor;
+    if (hpPerTon < 50) {
+      verdictText = 'Pesado demais'; verdictColor = '#f05252';
+      verdictSub  = 'Motor subdimensionado pra esse peso';
+    } else if (hpPerTon < 100) {
+      verdictText = 'Equilibrado'; verdictColor = '#f5a623';
+      verdictSub  = 'Adequado, mas sem folga de potencia';
+    } else if (hpPerTon < 200) {
+      verdictText = 'Bom'; verdictColor = '#3ecf8e';
+      verdictSub  = 'Relacao potencia/peso saudavel';
+    } else {
+      verdictText = 'Excelente'; verdictColor = '#4a8fff';
+      verdictSub  = 'Motor superdimensionado - muito torque';
+    }
+
+    document.getElementById('pw-hppt').textContent        = Math.round(hpPerTon) + ' hp/t';
+    document.getElementById('pw-ratio').textContent       = pwRatio.toFixed(4) + ' hp/lb';
+    document.getElementById('pw-060').textContent         = t060.toFixed(2) + 's';
+    document.getElementById('pw-tqmin').textContent       = Math.round(tqMin) + ' lbf.ft';
+    document.getElementById('pw-accel').textContent       = accelG.toFixed(3) + ' g';
+    document.getElementById('pw-verdict').textContent     = verdictText;
+    document.getElementById('pw-verdict').style.color     = verdictColor;
+    document.getElementById('pw-verdict-sub').textContent = verdictSub;
+
+    var txt = '';
+    txt += 'HP total (boost pleno)   = ' + hpTotal.toFixed(1) + ' HP\n';
+    txt += 'Peso                     = ' + weight + ' lbs  /  ' + wKg.toFixed(0) + ' kg  /  ' + wTon.toFixed(3) + ' t\n';
+    txt += '\n';
+    txt += 'HP / tonelada (metrico):\n';
+    txt += '  = ' + hpTotal.toFixed(1) + ' / ' + wTon.toFixed(3) + ' = ' + hpPerTon.toFixed(1) + ' hp/t\n';
+    txt += '  Ref: caminhao ~30 | carro popular ~80 | esportivo ~150 | supercar >250\n';
+    txt += '\n';
+    txt += 'Torque de pico estimado no motor (HP -> TQ):\n';
+    txt += '  TQ = (HP x 5252) / PeakRPM\n';
+    txt += '     = (' + hpTotal.toFixed(1) + ' x 5252) / ' + peak + ' = ' + tqPeak.toFixed(1) + ' lbf.ft\n';
+    txt += '\n';
+    txt += 'Torque minimo para vencer resistencia de rolamento (~1.5% do peso):\n';
+    txt += '  F_rol = ' + weight + ' x 0.015 = ' + rollingRes.toFixed(1) + ' lbf\n';
+    txt += '  TQ_min = ' + tqMin.toFixed(1) + ' lbf.ft\n';
+    txt += '  Torque disponivel = ' + tqPeak.toFixed(1) + ' lbf.ft  ' + (tqPeak >= tqMin ? '[OK]' : '[ATENCAO - insuficiente]') + '\n';
+    txt += '\n';
+    txt += 'Aceleracao maxima teorica a 60 mph:\n';
+    txt += '  F = HP x 550 / 88 = ' + fAtSpeed.toFixed(1) + ' lbf\n';
+    txt += '  m = ' + weight + ' / 32.2 = ' + mass.toFixed(2) + ' slugs\n';
+    txt += '  a = ' + (fAtSpeed/mass).toFixed(2) + ' ft/s2  =  ' + accelG.toFixed(3) + ' g\n';
+    txt += '\n';
+    txt += '0-60 mph estimado (aceleracao media = 60% do pico):\n';
+    txt += '  t = 88 / (' + accelG.toFixed(3) + ' x 0.60 x 32.2) = ' + t060.toFixed(2) + ' s';
+    document.getElementById('pw-formula-text').textContent = txt;
+  }
+
+  /* ── DRIVETRAIN ── */
+  var SPEED_SCALING = (10/12) * (60/88); // studs/s -> mph (mesma constante do Drive.lua)
+
+  function calcDrivetrain() {
+    var finalDrive = v('dt-finaldrive');
+    var fdMult     = v('dt-fdmult');
+    var redline    = v('dt-redline');
+    var wDiaX      = v('dt-wdia-x');
+    var wDiaY      = v('dt-wdia-y');
+    var wDiaZ      = v('dt-wdia-z');
+    var wDia       = wDiaX; // Drive.lua usa especificamente v.Size.x como diâmetro
+    var ratiosRaw  = document.getElementById('dt-ratios').value;
+    var ratios = ratiosRaw.split(',').map(function(s){ return parseFloat(s.trim()); }).filter(function(n){ return !isNaN(n) && n > 0; });
+
+    var fFD = finalDrive * fdMult;
+    var wDRatio = wDia * Math.PI / 60; // studs por radiano/seg -> stud/s
+
+    var tbody = document.querySelector('#dt-table tbody');
+    tbody.innerHTML = '';
+    var rows = [];
+    ratios.forEach(function(ratio, i) {
+      // RPM da roda = RPM motor / (ratio x finaldrive); vel angular roda (rad/s) = RPM_roda x 2π/60
+      var wheelRPM = redline / (ratio * fFD);
+      var wheelRadS = wheelRPM * 2 * Math.PI / 60;
+      var studsPerSec = wheelRadS * (wDia/2);
+      var mph = studsPerSec * SPEED_SCALING;
+      var kmh = mph * 1.609;
+      rows.push({gear: i+1, ratio: ratio, mph: mph, kmh: kmh});
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + (i+1) + 'ª</td><td class="num">' + ratio.toFixed(2) + '</td><td class="num">' + mph.toFixed(1) + '</td><td class="num">' + kmh.toFixed(1) + '</td>';
+      tbody.appendChild(tr);
+    });
+
+    var txt = 'Size da roda no Roblox = (' + wDiaX + ', ' + wDiaY + ', ' + wDiaZ + ')\n';
+    txt += 'Diametro usado = v.Size.x = ' + wDia + '  (e o eixo que o Drive.lua usa: "if v.Size.x>wDia then wDia=v.Size.x")\n\n';
+    txt += 'fFD (FinalDrive efetivo) = FinalDrive x FDMult = ' + finalDrive + ' x ' + fdMult + ' = ' + fFD.toFixed(3) + '\n';
+    txt += 'wDRatio (raio efetivo)   = Diametro x pi / 60 = ' + wDRatio.toFixed(4) + '\n\n';
+    txt += 'Para cada marcha, na redline (' + redline + ' RPM):\n';
+    txt += '  RPM_roda    = Redline / (Ratio x fFD)\n';
+    txt += '  Vel angular = RPM_roda x 2pi / 60  (rad/s)\n';
+    txt += '  Vel linear  = Vel_angular x (Diametro/2)  (studs/s)\n';
+    txt += '  MPH         = Vel_linear x (10/12) x (60/88)\n\n';
+    rows.forEach(function(r) {
+      txt += '  ' + r.gear + 'a marcha (ratio ' + r.ratio.toFixed(2) + '):  ' + r.mph.toFixed(1) + ' mph  /  ' + r.kmh.toFixed(1) + ' km/h\n';
+    });
+    txt += '\nObs: calculo teorico (sem patinagem, sem perdas). A velocidade real\n';
+    txt += 'tende a ser um pouco menor por causa do slip e da curva de torque.';
+    document.getElementById('dt-formula-text').textContent = txt;
+  }
+
+  /* ── FREIOS ── */
+  function calcBrakes() {
+    var brakeForce = v('bk-force');
+    var bias       = v('bk-bias') / 100;
+    var weight     = v('bk-weight');
+    var speedMph   = v('bk-speed');
+    var mu         = v('bk-mu');
+    var eForce     = v('bk-eforce');
+
+    var fForce = brakeForce * bias;
+    var rForce = brakeForce * (1 - bias);
+
+    document.getElementById('bk-ffront').textContent = Math.round(fForce).toLocaleString();
+    document.getElementById('bk-frear').textContent  = Math.round(rForce).toLocaleString();
+
+    // Distancia de frenagem teorica: d = v^2 / (2 x mu x g), v em ft/s, g em ft/s^2
+    var speedFtS = speedMph * 1.467; // mph -> ft/s
+    var g = 32.2;
+    var decelG = mu; // aproximação: deceleração máxima ~ µ x g, limitada pelo atrito do pneu (não pela força do motor de freio, que no A-Chassis é abstrata)
+    var distFt = (speedFtS * speedFtS) / (2 * mu * g);
+    var distM  = distFt * 0.3048;
+
+    document.getElementById('bk-dist').textContent = distFt.toFixed(0) + ' ft';
+    document.getElementById('bk-dist-sub').textContent = distM.toFixed(0) + ' m  ·  a partir de ' + speedMph + ' mph';
+
+    var massSlug = weight / g;
+    var maxBrakeDecelG = (brakeForce / massSlug) / g; // aproximação grosseira da força de freio do chassi vs massa
+
+    var txt = 'Forca dianteira = BrakeForce x BrakeBias = ' + brakeForce + ' x ' + bias.toFixed(2) + ' = ' + Math.round(fForce).toLocaleString() + '\n';
+    txt += 'Forca traseira  = BrakeForce x (1-BrakeBias) = ' + brakeForce + ' x ' + (1-bias).toFixed(2) + ' = ' + Math.round(rForce).toLocaleString() + '\n';
+    txt += 'EBrakeForce (freio motor, atua quando solta o acelerador) = ' + eForce + '\n';
+    txt += '\n';
+    txt += 'Distancia de frenagem teorica (limitada pelo atrito do pneu):\n';
+    txt += '  v (ft/s) = ' + speedMph + ' x 1.467 = ' + speedFtS.toFixed(1) + ' ft/s\n';
+    txt += '  d = v^2 / (2 x mu x g) = ' + speedFtS.toFixed(1) + '^2 / (2 x ' + mu + ' x 32.2)\n';
+    txt += '    = ' + distFt.toFixed(1) + ' ft  (' + distM.toFixed(1) + ' m)\n';
+    txt += '\n';
+    txt += 'Capacidade de freio do chassi vs massa (estimativa grosseira):\n';
+    txt += '  massa = peso / g = ' + weight + ' / 32.2 = ' + massSlug.toFixed(1) + ' slugs\n';
+    txt += '  decel_max ~ BrakeForce / massa / g = ' + maxBrakeDecelG.toFixed(2) + ' g\n';
+    txt += '  ' + (maxBrakeDecelG >= mu ? '[OK - o freio consegue travar o pneu antes do limite de atrito]' : '[ATENCAO - BrakeForce pode estar fraco para esse peso, considere aumentar]');
+    document.getElementById('bk-formula-text').textContent = txt;
+  }
+
+  /* ── STEERING ── */
+  function calcSteering() {
+    var lockToLock = v('st-locktolock');
+    var steerRatio = v('st-ratio');
+    var ackerman   = v('st-ackerman') / 100;
+    var wheelbase  = v('st-wheelbase');
+    var track      = v('st-track');
+
+    var steerOuter = (lockToLock * 180) / steerRatio;
+    var steerInner = Math.min(steerOuter - (steerOuter * (1 - ackerman)), steerOuter * 1.2);
+
+    document.getElementById('st-outer').textContent = steerOuter.toFixed(1) + '°';
+    document.getElementById('st-inner').textContent = steerInner.toFixed(1) + '°';
+
+    // Raio de giro aproximado usando o angulo da roda interna (mais esterçada)
+    var innerRad = steerInner * Math.PI / 180;
+    var turnRadius = (innerRad > 0.001) ? (wheelbase / Math.tan(innerRad)) + (track/2) : Infinity;
+
+    document.getElementById('st-radius').textContent = isFinite(turnRadius) ? turnRadius.toFixed(1) + ' studs' : '—';
+
+    var txt = 'SteerOuter = (LockToLock x 180) / SteerRatio\n';
+    txt += '           = (' + lockToLock + ' x 180) / ' + steerRatio + ' = ' + steerOuter.toFixed(2) + ' graus\n';
+    txt += '\n';
+    txt += 'SteerInner = min(SteerOuter - (SteerOuter x (1-Ackerman)), SteerOuter x 1.2)\n';
+    txt += '           = min(' + steerOuter.toFixed(2) + ' - (' + steerOuter.toFixed(2) + ' x ' + (1-ackerman).toFixed(2) + '), ' + (steerOuter*1.2).toFixed(2) + ')\n';
+    txt += '           = ' + steerInner.toFixed(2) + ' graus\n';
+    txt += '\n';
+    txt += 'Raio de giro aproximado (modelo de bicicleta, baseado na roda interna):\n';
+    txt += '  R = Wheelbase / tan(SteerInner) + Track/2\n';
+    txt += '    = ' + wheelbase + ' / tan(' + steerInner.toFixed(2) + ') + ' + track + '/2\n';
+    txt += '    = ' + (isFinite(turnRadius) ? turnRadius.toFixed(2) : '∞') + ' studs\n';
+    txt += '\nObs: aproximacao geometrica simples. O comportamento real no jogo\n';
+    txt += 'tambem depende de SteerSpeed, ReturnSpeed e da decaimento por velocidade.';
+    document.getElementById('st-formula-text').textContent = txt;
+  }
+
+  function calc() { calcHP(); calcPowerWeight(); calcSus(); calcDrivetrain(); calcBrakes(); calcSteering(); }
+
+
+  ['hp','peakrpm','redline','cr','tcount','tboost','scount','sboost',
+   'weight','wdist','cgh','fwd','rwd','axd',
+   'fstiff','fdamp','flen','fprecomp','fext','fcomp',
+   'rstiff','rdamp','rlen','rprecomp','rext','rcomp',
+   'dt-finaldrive','dt-fdmult','dt-redline','dt-wdia-x','dt-wdia-y','dt-wdia-z',
+   'bk-force','bk-bias','bk-weight','bk-speed','bk-mu','bk-eforce',
+   'st-locktolock','st-ratio','st-ackerman','st-wheelbase','st-track'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', calc);
+  });
+  document.getElementById('dt-ratios').addEventListener('input', calc);
+
+  document.getElementById('turbo-en').addEventListener('change', function() {
+    document.getElementById('turbo-pill').textContent = this.checked ? 'ON' : 'OFF';
+    document.getElementById('turbo-pill').className = 'pill ' + (this.checked ? 'pill-on' : 'pill-off');
+    calc();
+  });
+  document.getElementById('super-en').addEventListener('change', function() {
+    document.getElementById('super-pill').textContent = this.checked ? 'ON' : 'OFF';
+    document.getElementById('super-pill').className = 'pill ' + (this.checked ? 'pill-on' : 'pill-off');
+    calc();
+  });
+
+  /* ── Tabs ── */
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelector('.tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+    });
+  });
+
+  /* ── Collapsible formula cards ── */
+  document.querySelectorAll('.formula-card[data-collapsible]').forEach(function(card) {
+    var toggle = card.querySelector('.formula-toggle');
+    toggle.addEventListener('click', function() {
+      card.classList.toggle('open');
+    });
+  });
+
+  calc();
+</script>
+</body>
+</html>
