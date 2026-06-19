@@ -1,0 +1,17 @@
+{
+  "name": "ac6c-hp-calculator",
+  "version": "1.0.0",
+  "description": "AC6C Tune Calculator - servidor Express",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo \"static site, no build step needed\"",
+    "deploy": "echo \"nothing to deploy, server.js serves /public directly\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
