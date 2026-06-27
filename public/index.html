@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AC6C — Tune Maker</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AC6C — Tune Maker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -46,7 +46,7 @@
 
 <!-- MAIN -->
 <div class="main">
-  <!-- TOP CONTROLS (Novidade) -->
+  <!-- TOP CONTROLS -->
   <div class="top-controls">
     <button class="btn btn-ghost" id="lang-btn">🇺🇸 EN-US</button>
     <button class="btn btn-outline" id="save-local-btn" data-i18n="save">💾 Salvar Local</button>
@@ -67,6 +67,7 @@
   </div>
 
   <div class="main-inner">
+
     <!-- ══ MOTOR ══ -->
     <div class="tab-panel active" data-panel="engine">
       <div class="page-head"><div><h1 data-i18n="engine">Motor</h1><p>Curva de potência · torque no dyno</p></div></div>
@@ -87,12 +88,15 @@
             <div class="field"><label>CompressionRatio</label><input type="number" data-tune="CompressionRatio" id="cr" value="8.5" step="0.1"></div>
             <div class="field"><label>IdleRPM</label><input type="number" data-tune="IdleRPM" id="idlerpm" value="700"></div>
             <div class="field"><label>IdleThrottle (%)</label><input type="number" data-tune="IdleThrottle" id="idlethrot" value="3"></div>
-            <div class="field"><label title="Velocidade que o RPM sobe">RevAccel <span class="help-icon">(?)</span></label><input type="number" data-tune="RevAccel" id="revaccel" value="250"></div>
+            <div class="field"><label title="Velocidade que o RPM sobe livremente">RevAccel <span class="help-icon">(?)</span></label><input type="number" data-tune="RevAccel" id="revaccel" value="250"></div>
             <div class="field"><label>RevDecay</label><input type="number" data-tune="RevDecay" id="revdecay" value="75"></div>
             <div class="field"><label>RevBounce</label><input type="number" data-tune="RevBounce" id="revbounce" value="250"></div>
-            <div class="field"><label title="Inércia do motor. Mais alto = RPM mais estável, porém sobe mais devagar">Flywheel <span class="help-icon">(?)</span></label><input type="number" data-tune="Flywheel" id="flywheel" value="300"></div>
+            <div class="field"><label title="Inércia do motor. Mais alto = RPM mais estável, porém sobe devagar">Flywheel <span class="help-icon">(?)</span></label><input type="number" data-tune="Flywheel" id="flywheel" value="300"></div>
             <div class="field"><label>PeakSharpness</label><input type="number" data-tune="PeakSharpness" id="sharp" value="6.5" step="0.1"></div>
             <div class="field"><label>CurveMult</label><input type="number" data-tune="CurveMult" id="curvemult" value="0.2" step="0.01"></div>
+            <div class="field"><label>ThrotAccel</label><input type="number" data-tune="ThrotAccel" id="throtaccel" value="0.025" step="0.001"></div>
+            <div class="field"><label>ThrotDecel</label><input type="number" data-tune="ThrotDecel" id="throtdecel" value="0.15" step="0.001"></div>
+            <div class="field"><label>InclineComp</label><input type="number" data-tune="InclineComp" id="inclinecomp" value="1" step="0.1"></div>
           </div>
           <div class="toggle-row" style="margin-top:.85rem;margin-bottom:0;">
             <label class="toggle-label"><label class="switch"><input type="checkbox" id="engine-en" data-tune="Engine" data-tune-bool checked><span class="slider-sw"></span></label>Motor a combustão</label>
@@ -137,20 +141,475 @@
         </div>
         <div class="chart-wrap"><canvas id="hpChart"></canvas></div>
       </div>
-      
-      <!-- Fórmulas colapsáveis (reduzidas para espaço) -->
+
+      <div class="section-label">Potência vs Peso</div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-amber"><p class="lbl">HP/Tonelada</p><p class="val" id="pw-hppt">—</p><p class="sub">métrico</p></div>
+        <div class="metric metric-green"><p class="lbl" id="lbl-060">0–100 km/h est.</p><p class="val" id="pw-060">—</p><p class="sub">estimativa</p></div>
+        <div class="metric"><p class="lbl">Veredito</p><p class="val" id="pw-verdict-main" style="font-size:.85rem">—</p><p class="sub" id="pw-verdict-sub">—</p></div>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-purple"><p class="lbl">HP/lb</p><p class="val" id="pw-ratio">—</p><p class="sub">razão direta</p></div>
+        <div class="metric metric-purple"><p class="lbl">TQ mín. p/ rolar</p><p class="val" id="pw-tqmin">—</p><p class="sub">lbf.ft</p></div>
+        <div class="metric metric-purple"><p class="lbl">Aceleração máx</p><p class="val" id="pw-accel">—</p><p class="sub">a ~<span class="spd-unit">km/h</span> de ref.</p></div>
+      </div>
+
       <div class="formula-card" data-collapsible>
-        <button class="formula-toggle"><p class="card-title">Cálculos de potência</p><span class="chev">▼</span></button>
-        <div class="formula-body"><pre id="formula-text"></pre></div>
+        <button class="formula-toggle"><p class="card-title">Cálculos potência/peso</p><span class="chev">▼</span></button>
+        <div class="formula-body"><pre id="pw-formula-text"></pre></div>
       </div>
     </div>
 
-    <!-- ══ DRIVETRAIN (Resumo para exemplo, adicione o resto das abas do seu HTML original aqui) ══ -->
+    <!-- ══ CÂMBIO & EMBREAGEM ══ -->
     <div class="tab-panel" data-panel="drivetrain-clutch">
-        <div class="page-head"><div><h1>CÂMBIO & EMBREAGEM</h1></div></div>
-        <div class="card"><p>Conteúdo das engrenagens aqui...</p></div>
+      <div class="page-head"><div><h1>CÂMBIO & EMBREAGEM</h1><p>AutoShift · ClutchType · tempos de troca</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">AutoShift</p>
+          <div class="field-group">
+            <div class="field"><label>AutoShiftType</label><select id="autoshifttype" data-tune="AutoShiftType" data-tune-str><option value="DCT">DCT (tempo fixo)</option><option value="Rev">Rev (por RPM)</option></select></div>
+            <div class="field"><label>AutoShiftVers</label><select id="autoshiftvers" data-tune="AutoShiftVers" data-tune-str><option value="New">New (R/N/D)</option><option value="Old">Old (R ou D)</option></select></div>
+            <div class="field"><label>AutoShiftMode</label><select id="autoshiftmode" data-tune="AutoShiftMode" data-tune-str><option value="Speed">Speed</option><option value="RPM">RPM</option></select></div>
+            <div class="field"><label>ShiftUpTime (s)</label><input type="number" data-tune="ShiftUpTime" id="shiftuptime" value="0.5" step="0.01"></div>
+            <div class="field"><label>ShiftDnTime (s)</label><input type="number" data-tune="ShiftDnTime" id="shiftdntime" value="0.65" step="0.01"></div>
+            <div class="field"><label>ShiftThrot (%)</label><input type="number" data-tune="ShiftThrot" id="shiftthrot" value="100"></div>
+            <div class="field"><label>AutoUpThresh</label><input type="number" data-tune="AutoUpThresh" id="autoupthresh" value="-200"></div>
+            <div class="field"><label>AutoDownThresh</label><input type="number" data-tune="AutoDownThresh" id="autodownthresh" value="1400"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Embreagem</p>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="clutch-en" data-tune="Clutch" data-tune-bool checked><span class="slider-sw"></span></label>Clutch habilitado</label>
+            <span class="pill pill-on" id="clutch-pill">ON</span>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="stall-en" data-tune="Stall" data-tune-bool checked><span class="slider-sw"></span></label>Stall (afoga)</label>
+          </div>
+          <div class="field-group">
+            <div class="field"><label>ClutchType</label><select id="clutchtype" data-tune="ClutchType" data-tune-str><option value="Clutch">Clutch</option><option value="TorqueConverter">TorqueConverter</option><option value="CVT">CVT</option></select></div>
+            <div class="field"><label>ClutchMode</label><select id="clutchmode" data-tune="ClutchMode" data-tune-str><option value="New">New (Speed)</option><option value="Old">Old (Speed+RPM)</option></select></div>
+            <div class="field"><label>ClutchEngage</label><input type="number" data-tune="ClutchEngage" id="clutchengage" value="10"></div>
+            <div class="field"><label>ClutchRPMMult</label><input type="number" data-tune="ClutchRPMMult" id="clutchrpmmult" value="1" step="0.1"></div>
+            <div class="field"><label>SpeedEngage (SPS)</label><input type="number" data-tune="SpeedEngage" id="speedengage" value="20"></div>
+            <div class="field"><label>RPMEngage</label><input type="number" data-tune="RPMEngage" id="rpmengage" value="3500"></div>
+          </div>
+          <div class="section-label" style="margin-top:.8rem">ClutchKick</div>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="ck-en" data-tune="ClutchKick" data-tune-bool><span class="slider-sw"></span></label>ClutchKick</label>
+            <span class="pill pill-off" id="ck-pill">OFF</span>
+          </div>
+          <div class="field-group">
+            <div class="field"><label>KickMult</label><input type="number" data-tune="KickMult" id="kickmult" value="5" step="0.1"></div>
+            <div class="field"><label>KickSpeedThresh (SPS)</label><input type="number" data-tune="KickSpeedThreshold" id="kickspeed" value="20"></div>
+            <div class="field"><label>KickRPMThresh</label><input type="number" data-tune="KickRPMThreshold" id="kickrpm" value="2000"></div>
+          </div>
+        </div>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-amber"><p class="lbl">Tempo troca (up)</p><p class="val" id="cl-shiftup">—</p><p class="sub">DCT / Rev</p></div>
+        <div class="metric metric-amber"><p class="lbl">Perda RPM est.</p><p class="val" id="cl-rpmloss">—</p><p class="sub">por troca (DCT)</p></div>
+        <div class="metric"><p class="lbl">Veredito</p><p class="val" id="cl-verdict" style="font-size:.82rem">—</p><p class="sub" id="cl-verdict-sub">—</p></div>
+      </div>
     </div>
-    <!-- (MANTENHA TODAS AS SUAS OUTRAS ABAS ORIGINAIS AQUI: diff, weight, brakes, etc.) -->
+
+    <!-- ══ DIFERENCIAL ══ -->
+    <div class="tab-panel" data-panel="diff">
+      <div class="page-head"><div><h1>DIFERENCIAL</h1><p>Power/Coast/Preload · TorqueVector AWD</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Tipo & Config</p>
+          <div class="field-group">
+            <div class="field"><label>DifferentialType</label><select id="difftype" data-tune="DifferentialType" data-tune-str><option value="New">New (Power/Coast)</option><option value="Old">Old (Slip/Lock)</option></select></div>
+            <div class="field"><label>Config</label><select id="diffconfig" data-tune="Config" data-tune-str><option value="RWD">RWD</option><option value="FWD">FWD</option><option value="AWD">AWD</option></select></div>
+            <div class="field"><label>TorqueVector (AWD)</label><input type="number" data-tune="TorqueVector" id="torquevector" value="0.3" step="0.05"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Dianteiro (FWD/AWD)</p>
+          <div class="field-group">
+            <div class="field"><label>FDiffPower (New)</label><input type="number" data-tune="FDiffPower" id="fdiffpower" value="20"></div>
+            <div class="field"><label>FDiffCoast (New)</label><input type="number" data-tune="FDiffCoast" id="fdiffcoast" value="10"></div>
+            <div class="field"><label>FDiffPreload (New)</label><input type="number" data-tune="FDiffPreload" id="fdiffpreload" value="10"></div>
+            <div class="field"><label>FDiffSlipThres (Old)</label><input type="number" data-tune="FDiffSlipThres" id="fdiffslip" value="10"></div>
+            <div class="field"><label>FDiffLockThres (Old)</label><input type="number" data-tune="FDiffLockThres" id="fdifflock" value="80"></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Traseiro (RWD/AWD)</p>
+          <div class="field-group">
+            <div class="field"><label>RDiffPower (New)</label><input type="number" data-tune="RDiffPower" id="rdiffpower" value="20"></div>
+            <div class="field"><label>RDiffCoast (New)</label><input type="number" data-tune="RDiffCoast" id="rdiffcoast" value="10"></div>
+            <div class="field"><label>RDiffPreload (New)</label><input type="number" data-tune="RDiffPreload" id="rdiffpreload" value="10"></div>
+            <div class="field"><label>RDiffSlipThres (Old)</label><input type="number" data-tune="RDiffSlipThres" id="rdiffslip" value="10"></div>
+            <div class="field"><label>RDiffLockThres (Old)</label><input type="number" data-tune="RDiffLockThres" id="rdifflock" value="80"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Central (AWD, Old)</p>
+          <div class="field-group">
+            <div class="field"><label>CDiffSlipThres</label><input type="number" data-tune="CDiffSlipThres" id="cdiffslip" value="10"></div>
+            <div class="field"><label>CDiffLockThres</label><input type="number" data-tune="CDiffLockThres" id="cdifflock" value="80"></div>
+          </div>
+        </div>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-purple"><p class="lbl">Bias frente/trás</p><p class="val" id="diff-bias">—</p><p class="sub">via TorqueVector (AWD)</p></div>
+        <div class="metric metric-purple"><p class="lbl">Trava potência (F)</p><p class="val" id="diff-flock">—</p><p class="sub">% bloqueio est.</p></div>
+        <div class="metric metric-purple"><p class="lbl">Trava potência (R)</p><p class="val" id="diff-rlock">—</p><p class="sub">% bloqueio est.</p></div>
+      </div>
+    </div>
+
+    <!-- ══ PESO & SUSPENSÃO ══ -->
+    <div class="tab-panel" data-panel="weight">
+      <div class="page-head"><div><h1>PESO & SUSPENSÃO</h1><p>Stiffness · damping · frequência natural</p></div></div>
+      <div class="section-label">Presets rápidos</div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.9rem;">
+        <button class="btn btn-ghost sus-preset" data-preset="comfort">🛋 Conforto</button>
+        <button class="btn btn-ghost sus-preset" data-preset="sport">🏎 Esportivo</button>
+        <button class="btn btn-ghost sus-preset" data-preset="race">🏁 Corrida</button>
+        <button class="btn btn-ghost sus-preset" data-preset="offroad">🪨 Off-road</button>
+      </div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Peso</p>
+          <div class="field-group">
+            <div class="field"><label>Weight (lbs)</label><input type="number" data-tune="Weight" id="weight" value="5200"></div>
+            <div class="field"><label>WeightDist (% frente)</label><input type="number" data-tune="WeightDist" id="wdist" value="55"></div>
+            <div class="field"><label>CGHeight (studs)</label><input type="number" data-tune="CGHeight" id="cgh" value="1.4" step="0.1"></div>
+            <div class="field"><label>FWheelDensity</label><input type="number" data-tune="FWheelDensity" id="fwd" value="0.2" step="0.01"></div>
+            <div class="field"><label>RWheelDensity</label><input type="number" data-tune="RWheelDensity" id="rwd" value="0.2" step="0.01"></div>
+            <div class="field"><label>AxleDensity</label><input type="number" data-tune="AxleDensity" id="axd" value="0.1" step="0.01"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Suspensão</p>
+          <div class="field-group">
+            <div class="field"><label>FSusStiffness</label><input type="number" data-tune="FSusStiffness" id="fstiff" value="16000"></div>
+            <div class="field"><label>FSusDamping</label><input type="number" data-tune="FSusDamping" id="fdamp" value="300"></div>
+            <div class="field"><label>FSusLength</label><input type="number" data-tune="FSusLength" id="flen" value="2" step="0.1"></div>
+            <div class="field"><label>FPreCompress</label><input type="number" data-tune="FPreCompress" id="fprecomp" value="0.6" step="0.01"></div>
+            <div class="field"><label>FExtensionLim</label><input type="number" data-tune="FExtensionLim" id="fext" value="0.4" step="0.05"></div>
+            <div class="field"><label>FCompressLim</label><input type="number" data-tune="FCompressLim" id="fcomp" value="0.1" step="0.05"></div>
+          </div>
+          <div class="field-group" style="margin-top: 1rem;">
+            <div class="field"><label>RSusStiffness</label><input type="number" data-tune="RSusStiffness" id="rstiff" value="16000"></div>
+            <div class="field"><label>RSusDamping</label><input type="number" data-tune="RSusDamping" id="rdamp" value="300"></div>
+            <div class="field"><label>RSusLength</label><input type="number" data-tune="RSusLength" id="rlen" value="2" step="0.1"></div>
+            <div class="field"><label>RPreCompress</label><input type="number" data-tune="RPreCompress" id="rprecomp" value="0.6" step="0.01"></div>
+            <div class="field"><label>RExtensionLim</label><input type="number" data-tune="RExtensionLim" id="rext" value="0.4" step="0.05"></div>
+            <div class="field"><label>RCompressLim</label><input type="number" data-tune="RCompressLim" id="rcomp" value="0.1" step="0.05"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sus-results">
+        <div class="metric metric-purple"><p class="lbl">Peso dianteiro</p><p class="val" id="s-wf">—</p><p class="sub" id="s-wf-sub">—</p></div>
+        <div class="metric metric-purple"><p class="lbl">Peso traseiro</p><p class="val" id="s-wr">—</p><p class="sub" id="s-wr-sub">—</p></div>
+        <div class="metric metric-purple"><p class="lbl">Peso total (kg)</p><p class="val" id="s-wkg">—</p><p class="sub">lbs ÷ 2.205</p></div>
+      </div>
+      <div class="sus-results" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-amber"><p class="lbl">Freq. natural F</p><p class="val" id="s-fnf">—</p><p class="sub">Hz · ideal 1–2 Hz</p></div>
+        <div class="metric metric-amber"><p class="lbl">Freq. natural R</p><p class="val" id="s-fnr">—</p><p class="sub">Hz · R > F = estável</p></div>
+        <div class="metric metric-amber"><p class="lbl">Pitch</p><p class="val" id="s-pitch" style="font-size:.85rem">—</p><p class="sub" id="s-pitch-sub">—</p></div>
+      </div>
+      <div class="card" style="margin-bottom:.85rem">
+        <p class="card-title">Calculadora de Ride Height</p>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:.65rem">
+          <div class="field" style="max-width:120px"><label>Ride height F</label><input type="number" id="rh-target-f" value="0.4" step="0.01"></div>
+          <div class="field" style="max-width:120px"><label>Ride height R</label><input type="number" id="rh-target-r" value="0.4" step="0.01"></div>
+          <button class="btn btn-amber" id="rh-calc-btn" style="margin-top:14px">Calcular</button>
+        </div>
+        <div id="rh-result" style="font-family:var(--mono);font-size:.75rem;color:var(--text2);line-height:1.8"></div>
+      </div>
+    </div>
+
+    <!-- ══ DRIVETRAIN ══ -->
+    <div class="tab-panel" data-panel="drivetrain">
+      <div class="page-head"><div><h1>Drivetrain</h1><p>FinalDrive · marchas · velocidade teórica</p></div></div>
+      <div id="gear-indicator">
+        <span class="gear-label">Marchas</span>
+        <div class="gear-box gear-rev" title="Ré">R</div>
+        <div class="gear-box" id="gb-n" title="Neutro">N</div>
+      </div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Parâmetros</p>
+          <div class="field-group">
+            <div class="field"><label>FinalDrive</label><input type="number" data-tune="FinalDrive" id="dt-finaldrive" value="3.42" step="0.01"></div>
+            <div class="field"><label>FDMult</label><input type="number" data-tune="FDMult" id="dt-fdmult" value="1" step="0.01"></div>
+            <div class="field" style="grid-column:1/-1">
+              <label>Size da roda Roblox (X Y Z studs)</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
+                <input type="number" id="dt-wdia-x" value="4.596" step="0.001" placeholder="X">
+                <input type="number" id="dt-wdia-y" value="4.656" step="0.001" placeholder="Y">
+                <input type="number" id="dt-wdia-z" value="4.656" step="0.001" placeholder="Z">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Ratios</p>
+          <div class="field-group" style="margin-bottom:.6rem">
+            <div class="field"><label>Ré (Reverse)</label><input type="number" id="dt-ratio-r" value="3.36" step="0.01"></div>
+          </div>
+          <div class="field">
+            <label>Marchas pra frente (1ª, 2ª...), vírgula</label>
+            <input type="text" id="dt-ratios" value="3.36, 2.07, 1.36, 1.03, 0.82, 0.65">
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:.8rem">
+        <p class="card-title">Velocidade máxima teórica por marcha (na redline)</p>
+        <table class="table-mini" id="dt-table">
+          <thead><tr><th>Marcha</th><th>Ratio</th><th>RPM roda</th><th id="dt-th-spd">Vel. máx (<span class="spd-unit">km/h</span>)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-purple"><p class="lbl">Vel. máx em ré</p><p class="val" id="dt-rev-spd">—</p><p class="sub" id="dt-rev-sub"></p></div>
+        <div class="metric metric-green"><p class="lbl">Vel. máx total</p><p class="val" id="dt-top-spd">—</p><p class="sub" id="dt-top-sub"></p></div>
+        <div class="metric metric-amber"><p class="lbl">Spread marchas</p><p class="val" id="dt-spread">—</p><p class="sub">1ª ÷ última</p></div>
+      </div>
+    </div>
+
+    <!-- ══ FREIOS ══ -->
+    <div class="tab-panel" data-panel="brakes">
+      <div class="page-head"><div><h1>FREIOS</h1><p>BrakeForce · ABS · TCS · distância de parada</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Parâmetros</p>
+          <div class="field-group">
+            <div class="field"><label>BrakeForce</label><input type="number" data-tune="BrakeForce" id="bk-force" value="3000"></div>
+            <div class="field"><label>BrakeBias (% frente)</label><input type="number" data-tune="BrakeBias" id="bk-bias" value="60"></div>
+            <div class="field"><label>PBrakeForce (mão)</label><input type="number" data-tune="PBrakeForce" id="bk-pforce" value="2000"></div>
+            <div class="field"><label>PBrakeBias (% frente)</label><input type="number" data-tune="PBrakeBias" id="bk-pbias" value="0"></div>
+            <div class="field"><label>EBrakeForce (motor)</label><input type="number" data-tune="EBrakeForce" id="bk-eforce" value="500"></div>
+            <div class="field"><label>Vel. teste (<span class="spd-unit">km/h</span>)</label><input type="number" id="bk-speed" value="100"></div>
+            <div class="field"><label>BrakeAccel</label><input type="number" data-tune="BrakeAccel" id="brakeaccel" value="0.15" step="0.001"></div>
+            <div class="field"><label>BrakeDecel</label><input type="number" data-tune="BrakeDecel" id="brakedecel" value="0.25" step="0.001"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">ABS & TCS</p>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="abs-en" data-tune="ABSEnabled" data-tune-bool checked><span class="slider-sw"></span></label>ABS habilitado</label>
+            <span class="pill pill-on" id="abs-pill">ON</span>
+          </div>
+          <div class="field-group">
+            <div class="field"><label>ABSThreshold</label><input type="number" data-tune="ABSThreshold" id="absthreshold" value="10"></div>
+            <div class="field"><label>µ atrito pneu</label><input type="number" id="bk-mu" value="0.9" step="0.05"></div>
+          </div>
+          <div class="toggle-row" style="margin-top:.85rem">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="tcs-en" data-tune="TCSEnabled" data-tune-bool checked><span class="slider-sw"></span></label>TCS habilitado</label>
+            <span class="pill pill-on" id="tcs-pill">ON</span>
+          </div>
+          <div class="field-group">
+            <div class="field"><label>TCSThreshold</label><input type="number" data-tune="TCSThreshold" id="tcsthreshold" value="10"></div>
+            <div class="field"><label>TCSLimit (%)</label><input type="number" data-tune="TCSLimit" id="tcslimit" value="30"></div>
+          </div>
+        </div>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-purple"><p class="lbl">Força dianteira</p><p class="val" id="bk-ffront">—</p><p class="sub">BrakeForce × Bias</p></div>
+        <div class="metric metric-purple"><p class="lbl">Força traseira</p><p class="val" id="bk-frear">—</p><p class="sub">BrakeForce × (1-Bias)</p></div>
+        <div class="metric metric-green"><p class="lbl">Dist. frenagem</p><p class="val" id="bk-dist">—</p><p class="sub" id="bk-dist-sub"></p></div>
+      </div>
+    </div>
+
+    <!-- ══ DIREÇÃO ══ -->
+    <div class="tab-panel" data-panel="steering">
+      <div class="page-head"><div><h1>DIREÇÃO</h1><p>Ackerman · SteerOuter/Inner · raio de giro</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Parâmetros</p>
+          <div class="field-group">
+            <div class="field"><label>SteeringType</label><select id="steeringtype" data-tune="SteeringType" data-tune-str><option value="New">New (LockToLock)</option><option value="Old">Old (Outer/Inner)</option></select></div>
+            <div class="field"><label>LockToLock</label><input type="number" data-tune="LockToLock" id="st-locktolock" value="2.6" step="0.1"></div>
+            <div class="field"><label>SteerRatio</label><input type="number" data-tune="SteerRatio" id="st-ratio" value="14" step="0.1"></div>
+            <div class="field"><label>Ackerman (%)</label><input type="number" data-tune="Ackerman" id="st-ackerman" value="100"></div>
+            <div class="field"><label>SteerSpeed</label><input type="number" data-tune="SteerSpeed" id="steerspeed" value="4" step="0.1"></div>
+            <div class="field"><label>ReturnSpeed</label><input type="number" data-tune="ReturnSpeed" id="returnspeed" value="8" step="0.1"></div>
+            <div class="field"><label>SteerDecay</label><input type="number" data-tune="SteerDecay" id="steerdecay" value="300"></div>
+            <div class="field"><label>MinSteer (%)</label><input type="number" data-tune="MinSteer" id="minsteer" value="15"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">4WS & Raio de Giro</p>
+          <div class="field-group">
+            <div class="field"><label>FWSteer</label><select id="fwsteer" data-tune="FWSteer" data-tune-str><option value="None">None</option><option value="Static">Static</option><option value="Speed">Speed</option><option value="Both">Both</option></select></div>
+            <div class="field"><label>RSteerOuter (°)</label><input type="number" data-tune="RSteerOuter" id="rsteer-outer" value="10" step="0.5"></div>
+            <div class="field"><label>RSteerInner (°)</label><input type="number" data-tune="RSteerInner" id="rsteer-inner" value="10" step="0.5"></div>
+            <div class="field"><label>RSteerSpeed (SPS)</label><input type="number" data-tune="RSteerSpeed" id="rsteer-speed" value="60"></div>
+            <div class="field"><label>RSteerDecay</label><input type="number" data-tune="RSteerDecay" id="rsteer-decay" value="330"></div>
+            <div class="field"><label>Wheelbase (studs)</label><input type="number" id="st-wheelbase" value="9" step="0.1"></div>
+            <div class="field"><label>Track width (studs)</label><input type="number" id="st-track" value="5.5" step="0.1"></div>
+          </div>
+        </div>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-amber"><p class="lbl">SteerOuter</p><p class="val" id="st-outer">—</p><p class="sub">ângulo roda ext.</p></div>
+        <div class="metric metric-amber"><p class="lbl">SteerInner</p><p class="val" id="st-inner">—</p><p class="sub">ângulo roda int.</p></div>
+        <div class="metric metric-green"><p class="lbl">Raio de giro</p><p class="val" id="st-radius">—</p><p class="sub">estimado, studs</p></div>
+      </div>
+    </div>
+
+    <!-- ══ MOTOR ELÉTRICO ══ -->
+    <div class="tab-panel" data-panel="electric">
+      <div class="page-head"><div><h1>MOTOR ELÉTRICO</h1><p>E_Horsepower · E_Torque · curva elétrica</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Habilitação</p>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="elec-en" data-tune="Electric" data-tune-bool><span class="slider-sw"></span></label>Motor elétrico</label>
+            <span class="pill pill-off" id="elec-pill">OFF</span>
+          </div>
+          <div class="field-group">
+            <div class="field"><label>E_Redline (RPM)</label><input type="number" data-tune="E_Redline" id="e-redline" value="12700"></div>
+            <div class="field"><label>E_Trans1 (RPM)</label><input type="number" data-tune="E_Trans1" id="e-trans1" value="4000"></div>
+            <div class="field"><label>E_Trans2 (RPM)</label><input type="number" data-tune="E_Trans2" id="e-trans2" value="7000"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">HP Elétrico</p>
+          <div class="field-group">
+            <div class="field"><label>E_Horsepower</label><input type="number" data-tune="E_Horsepower" id="e-hp" value="223"></div>
+            <div class="field"><label>EH_FrontMult</label><input type="number" data-tune="EH_FrontMult" id="e-hfrontmult" value="0.15" step="0.01"></div>
+            <div class="field"><label>EH_EndMult</label><input type="number" data-tune="EH_EndMult" id="e-hendmult" value="2.9" step="0.01"></div>
+            <div class="field"><label>EH_EndPercent (%)</label><input type="number" data-tune="EH_EndPercent" id="e-hendpct" value="7"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:.8rem">
+        <p class="card-title">Torque elétrico</p>
+        <div class="field-group">
+          <div class="field"><label>E_Torque</label><input type="number" data-tune="E_Torque" id="e-tq" value="286"></div>
+          <div class="field"><label>ET_EndMult</label><input type="number" data-tune="ET_EndMult" id="e-tqendmult" value="1.505" step="0.001"></div>
+          <div class="field"><label>ET_EndPercent (%)</label><input type="number" data-tune="ET_EndPercent" id="e-tqendpct" value="27.5" step="0.1"></div>
+        </div>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric metric-blue"><p class="lbl">HP Elétrico</p><p class="val" id="elec-hp">—</p><p class="sub">E_Horsepower</p></div>
+        <div class="metric metric-blue"><p class="lbl">Torque elétrico</p><p class="val" id="elec-tq">—</p><p class="sub">E_Torque</p></div>
+        <div class="metric metric-blue"><p class="lbl">Redline elétrica</p><p class="val" id="elec-rl">—</p><p class="sub">RPM</p></div>
+      </div>
+      <div class="results-row" style="grid-template-columns:repeat(2,1fr)">
+        <div class="metric metric-green"><p class="lbl">HP combinado total</p><p class="val" id="elec-combined" style="font-size:1.1rem">—</p><p class="sub">combustão + elétrico</p></div>
+        <div class="metric"><p class="lbl">Modo</p><p class="val" id="elec-mode" style="font-size:.85rem;color:var(--text2)">—</p><p class="sub">Engine + Electric</p></div>
+      </div>
+    </div>
+
+    <!-- ══ EXTRAS & MISC ══ -->
+    <div class="tab-panel" data-panel="extras">
+      <div class="page-head"><div><h1>EXTRAS & MISC</h1><p>Alinhamento · Wheel Alignment · AutoFlip</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title">Misc</p>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="autoflip-en" data-tune="AutoFlip" data-tune-bool checked><span class="slider-sw"></span></label>AutoFlip</label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="autostart-en" data-tune="AutoStart" data-tune-bool><span class="slider-sw"></span></label>AutoStart</label>
+          </div>
+          <div class="field-group">
+            <div class="field"><label>LoadDelay (s)</label><input type="number" data-tune="LoadDelay" id="loaddelay" value="1" step="0.1"></div>
+            <div class="field"><label>NeutralRevRPM</label><input type="number" data-tune="NeutralRevRPM" id="neutralrevrpm" value="5000"></div>
+          </div>
+          <div class="toggle-row" style="margin-top:.8rem">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="neutrallimit-en" data-tune="NeutralLimit" data-tune-bool checked><span class="slider-sw"></span></label>NeutralLimit</label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="limitclutch-en" data-tune="LimitClutch" data-tune-bool checked><span class="slider-sw"></span></label>LimitClutch</label>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Wheel Alignment (graus)</p>
+          <div class="field-group">
+            <div class="field"><label>FCamber</label><input type="number" data-tune="FCamber" id="fcamber" value="0" step="0.1"></div>
+            <div class="field"><label>RCamber</label><input type="number" data-tune="RCamber" id="rcamber" value="0" step="0.1"></div>
+            <div class="field"><label>FCaster</label><input type="number" data-tune="FCaster" id="fcaster" value="0" step="0.1"></div>
+            <div class="field"><label>RCaster</label><input type="number" data-tune="RCaster" id="rcaster" value="0" step="0.1"></div>
+            <div class="field"><label>FToe</label><input type="number" data-tune="FToe" id="ftoe" value="0" step="0.1"></div>
+            <div class="field"><label>RToe</label><input type="number" data-tune="RToe" id="rtoe" value="0" step="0.1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ENGINE SWITCH ══ -->
+    <div class="tab-panel" data-panel="engswitch">
+      <div class="page-head"><div><h1>ENGINESWITCH</h1><p>Calculadora elétrica reversa · config do script</p></div></div>
+      <div class="section-label">Calculadora — motor elétrico ideal</div>
+      <div class="card" style="margin-bottom:.75rem">
+        <p class="card-title">Alvos de performance (modo elétrico puro)</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem;margin-bottom:.75rem">
+          <div class="field"><label>Vel. máx elétrica (<span class="spd-unit">km/h</span>)</label><input type="number" id="es-vmax" value="120"></div>
+          <div class="field"><label>0–100 <span class="spd-unit">km/h</span> alvo (s)</label><input type="number" id="es-t100" value="6" step="0.1"></div>
+          <div class="field"><label>ELECTRIC_HP_LIMIT</label><input type="number" id="es-hplimit" value="300"></div>
+        </div>
+        <button class="btn btn-amber" id="es-calc-btn">⚡ Calcular parâmetros elétricos</button>
+      </div>
+
+      <div class="sus-results" style="grid-template-columns:repeat(3,1fr);margin-bottom:.75rem" id="es-results-grid">
+        <div class="metric metric-blue"><p class="lbl">E_Redline</p><p class="val" id="es-redline" style="color:var(--blue)">—</p><p class="sub">RPM</p></div>
+        <div class="metric metric-blue"><p class="lbl">E_Trans2</p><p class="val" id="es-trans2" style="color:var(--blue)">—</p><p class="sub">70% da redline</p></div>
+        <div class="metric metric-blue"><p class="lbl">E_Trans1</p><p class="val" id="es-trans1" style="color:var(--blue)">—</p><p class="sub">30% da redline</p></div>
+        <div class="metric metric-green"><p class="lbl">E_Horsepower</p><p class="val" id="es-hp" style="color:var(--green)">—</p><p class="sub">HP necessário</p></div>
+        <div class="metric metric-green"><p class="lbl">E_Torque</p><p class="val" id="es-tq" style="color:var(--green)">—</p><p class="sub">TQ estimado</p></div>
+        <div class="metric metric-amber"><p class="lbl">ELECTRIC_FIRST_GEAR</p><p class="val" id="es-firstgear" style="color:var(--amber)">—</p><p class="sub">ratio da 1ª elétrica</p></div>
+      </div>
+
+      <div style="display:flex;gap:.65rem;margin-bottom:.85rem;flex-wrap:wrap">
+        <button class="btn btn-outline" id="es-apply-btn">Aplicar ao painel elétrico</button>
+        <button class="btn btn-ghost" id="es-apply-sw-btn">Aplicar também ao EngineSwitch</button>
+      </div>
+
+      <div class="section-label">Configuração do EngineSwitch</div>
+      <div class="grid2" style="margin-bottom:.75rem">
+        <div class="card">
+          <p class="card-title">Comportamento</p>
+          <div class="field-group">
+            <div class="field">
+              <label>CHANGE_AT_SPEED (SPS)</label>
+              <input type="number" id="sw-speed" value="80">
+              <p class="field-note" id="sw-speed-kmh" style="margin-top:3px">≈ — km/h</p>
+            </div>
+            <div class="field">
+              <label>TOGGLE_KEY (teclado)</label>
+              <select id="sw-key">
+                <option value="G">G</option><option value="H">H</option><option value="J">J</option><option value="Z">Z</option>
+              </select>
+            </div>
+            <div class="field"><label>ELECTRIC_FIRST_GEAR</label><input type="number" id="sw-firstgear" value="10" step="0.1"></div>
+            <div class="field"><label>ELECTRIC_HP_LIMIT</label><input type="number" id="sw-hplimit" value="300"></div>
+          </div>
+          <div class="toggle-row" style="margin-top:.8rem">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="sw-print" checked><span class="slider-sw"></span></label>PRINT_STATES</label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label"><label class="switch"><input type="checkbox" id="sw-manual"><span class="slider-sw"></span></label>Troca manual (CHANGE_AT_SPEED = 0)</label>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Referência de velocidade</p>
+          <div class="sus-results" style="grid-template-columns:1fr 1fr;margin:0">
+            <div class="metric metric-amber"><p class="lbl">CHANGE_AT_SPEED</p><p class="val" id="sw-spd-sps" style="color:var(--amber);font-size:1rem">—</p><p class="sub">SPS</p></div>
+            <div class="metric metric-amber"><p class="lbl">Equivalente</p><p class="val" id="sw-spd-kmh" style="color:var(--amber);font-size:1rem">—</p><p class="sub" id="sw-spd-sub">km/h</p></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section-label">Exportar script</div>
+      <div class="card" style="margin-bottom:.85rem">
+        <p class="card-title">EngineSwitch.lua gerado</p>
+        <div style="display:flex;gap:.65rem;margin-bottom:.75rem;flex-wrap:wrap">
+          <button class="btn btn-amber" id="sw-export-btn">Gerar EngineSwitch.lua</button>
+          <button class="btn btn-outline" id="sw-copy-btn" style="display:none">Copiar</button>
+        </div>
+        <pre id="sw-output" style="font-family:var(--mono);font-size:.72rem;color:var(--text2);line-height:1.75;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:.85rem;white-space:pre-wrap;word-break:break-word;display:none"></pre>
+      </div>
+    </div>
 
   </div><!-- /main-inner -->
 </div><!-- /main -->
@@ -159,6 +618,39 @@
 <div class="export-bar">
   <button class="btn btn-amber" id="export-btn" data-i18n="export">Exportar Lua</button>
   <span class="export-status">Gera o A-Chassis Tune pronto pro Roblox</span>
+</div>
+
+<!-- MODAL EXPORT -->
+<div class="modal-backdrop" id="export-modal-backdrop">
+  <div class="modal">
+    <div class="modal-head"><h2>TUNE EXPORTADO</h2><button id="export-modal-close">✕</button></div>
+    <div class="modal-body"><pre id="export-output"></pre></div>
+    <div class="modal-foot">
+      <button class="btn btn-amber" id="export-copy-btn">Copiar código</button>
+      <button class="btn btn-outline" id="export-download-btn">Baixar .lua</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORT -->
+<div class="modal-backdrop" id="import-modal-backdrop">
+  <div class="modal">
+    <div class="modal-head"><h2>IMPORTAR TUNE</h2><button id="import-modal-close">✕</button></div>
+    <div class="modal-body" style="overflow:hidden">
+      <div class="import-area" style="margin:.9rem 1rem">
+        <p class="import-hint">Cole o conteúdo do Tune.lua (linhas "Tune.XXX = valor")</p>
+        <textarea id="import-textarea" placeholder="-- Cole aqui&#10;Tune.Horsepower = 135&#10;Tune.FinalDrive = 10.47&#10;..."></textarea>
+        <div class="import-drop-row">
+          <label class="btn btn-outline" style="cursor:pointer">Carregar arquivo .lua/.txt<input type="file" id="import-file-input" accept=".lua,.txt" style="display:none"></label>
+          <span class="import-status" id="import-status" style="display:none"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-amber" id="import-apply-btn">Aplicar tune</button>
+      <button class="btn btn-ghost" id="import-modal-close2">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <!-- TOAST CONTAINER -->
