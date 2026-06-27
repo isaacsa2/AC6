@@ -52,6 +52,38 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); disp
 .unit-btn:hover { border-color: var(--border3); color: var(--text2); }
 .unit-btn.active { background: var(--amber); border-color: var(--amber); color: #000; font-weight: 600; }
 
+/* === TOOLTIPS CUSTOMIZADOS === */
+.help-icon { position: relative; margin-left: 5px; color: var(--amber); font-weight: bold; cursor: help; font-size: 0.75rem; opacity: 0.7; }
+.help-icon:hover { opacity: 1; }
+
+.help-icon[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 130%; left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--amber);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  pointer-events: none;
+  z-index: 100;
+  animation: fadeIn 0.2s ease;
+}
+
+.help-icon[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%; left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--amber) transparent transparent transparent;
+  pointer-events: none;
+}
 /* === MAIN CONTENT === */
 .main { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; position: relative; }
 .top-controls { display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 2rem 0; }

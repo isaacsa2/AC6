@@ -704,3 +704,33 @@ document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
 document.querySelectorAll('.formula-card[data-collapsible]').forEach(card => {
   card.querySelector('.formula-toggle').addEventListener('click', () => card.classList.toggle('open'));
 });
+
+/* ─────────── ENGINE SWITCH (Velocidade e UI) ─────────── */
+function spsToSpd(sps){ return USE_KMH ? sps * 1.09728 : sps * 0.681818; }
+
+function updateSwSpeedLabel() {
+  let sps = v('sw-speed');
+  let manual = document.getElementById('sw-manual').checked;
+  let spdVal = spsToSpd(sps);
+  
+  let swSpeedKmh = document.getElementById('sw-speed-kmh');
+  if(swSpeedKmh) swSpeedKmh.textContent = '≈ ' + spdVal.toFixed(1) + ' ' + spdLabel() + (manual ? ' (ignorado)' : '');
+  
+  let swSpdSps = document.getElementById('sw-spd-sps');
+  if(swSpSpd = document.getElementById('sw-spd-sps')) swSpSpd.textContent = manual ? '0' : sps.toFixed(0) + ' SPS';
+  
+  let swSpdKmh = document.getElementById('sw-spd-kmh');
+  if(swSpdKmh) swSpdKmh.textContent = manual ? 'Manual' : spdVal.toFixed(1);
+  
+  let swSpdSub = document.getElementById('sw-spd-sub');
+  if(swSpdSub) swSpdSub.textContent = spdLabel();
+}
+
+// Eventos para atualizar os valores em tempo real
+document.getElementById('sw-speed').addEventListener('input', updateSwSpeedLabel);
+document.getElementById('sw-manual').addEventListener('change', updateSwSpeedLabel);
+
+// Chama a função uma vez ao carregar a página e também quando mudar de km/h para mph
+window.addEventListener('DOMContentLoaded', updateSwSpeedLabel);
+document.getElementById('unit-kmh').addEventListener('click', updateSwSpeedLabel);
+document.getElementById('unit-mph').addEventListener('click', updateSwSpeedLabel);
