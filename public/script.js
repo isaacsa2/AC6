@@ -46,11 +46,151 @@ function curveNfull(RPM, hp, peak, sharp, curveMult) {
   return base * (r - (Math.pow(r, sharp) / (sharp * Math.pow(p, sharp-1))));
 }
 
+function smoothTorqueCurve(samples, amount, windowSize) {
+  if(!Array.isArray(samples) || samples.length < 3) return samples || [];
+  let blend = Math.max(0, Math.min(1, (amount || 0) / 100));
+  if(blend <= 0) return samples.slice();
+
+  let radius = Math.max(1, Math.floor((Math.max(3, windowSize || 3) - 1) / 2));
+  let sigma = Math.max(1, radius / 1.35);
+  return samples.map((value, index) => {
+    if(index === 0 || index === samples.length - 1) return value;
+    let weighted = 0, weights = 0;
+    for(let offset = -radius; offset <= radius; offset++) {
+      let sampleIndex = Math.max(0, Math.min(samples.length - 1, index + offset));
+      let weight = Math.exp(-(offset * offset) / (2 * sigma * sigma));
+      weighted += samples[sampleIndex] * weight;
+      weights += weight;
+    }
+    let filtered = weights > 0 ? weighted / weights : value;
+    return Math.max(0, Math.round(value + (filtered - value) * blend));
+  });
+}
+
+function hpFromTorque(torque, rpm) {
+  return rpm > 100 ? (torque * rpm) / 5252 : 0;
+}
+
+function normalizeDynoCurve(hpSamples, torqueSamples, targetPeakHP) {
+  let peak = hpSamples.reduce((max, value) => Math.max(max, value), 0);
+  if(peak <= 0 || targetPeakHP <= 0) return { hp: hpSamples, torque: torqueSamples };
+  let scale = targetPeakHP / peak;
+  return {
+    hp: hpSamples.map(value => Math.max(0, Math.round(value * scale * 10) / 10)),
+    torque: torqueSamples.map(value => Math.max(0, Math.round(value * scale)))
+  };
+}
+
+function peakIndex(samples) {
+  let best = 0;
+  for(let i = 1; i < samples.length; i++) {
+    if(samples[i] > samples[best]) best = i;
+  }
+  return best;
+}
+
+function curveRoughness(samples) {
+  if(!Array.isArray(samples) || samples.length < 5) return 0;
+  let peak = samples.reduce((max, value) => Math.max(max, value), 0);
+  if(peak <= 0) return 0;
+  let sum = 0, count = 0;
+  for(let i = 2; i < samples.length - 2; i++) {
+    if(samples[i] <= 0) continue;
+    sum += Math.abs(samples[i - 1] - (2 * samples[i]) + samples[i + 1]) / peak;
+    count++;
+  }
+  return count > 0 ? sum / count : 0;
+}
+
+function hpShapeError(reference, candidate) {
+  let peak = reference.reduce((max, value) => Math.max(max, value), 0);
+  if(peak <= 0) return 0;
+  let sum = 0, weightSum = 0;
+  for(let i = 0; i < reference.length; i++) {
+    if(reference[i] <= peak * 0.05) continue;
+    let weight = Math.max(0.2, reference[i] / peak);
+    let err = (candidate[i] - reference[i]) / Math.max(10, reference[i]);
+    sum += err * err * weight;
+    weightSum += weight;
+  }
+  return weightSum > 0 ? Math.sqrt(sum / weightSum) : 0;
+}
+
+function dynoFromTorque(labels, torqueSamples, targetPeakHP) {
+  let hpSamples = torqueSamples.map((torque, index) => Math.max(0, Math.round(hpFromTorque(torque, labels[index]) * 10) / 10));
+  return normalizeDynoCurve(hpSamples, torqueSamples, targetPeakHP);
+}
+
+function autoSmoothDynoCurve(labels, hpSamples, torqueSamples) {
+  let targetPeakHP = hpSamples.reduce((max, value) => Math.max(max, value), 0);
+  let originalRoughness = curveRoughness(torqueSamples);
+  if(targetPeakHP <= 0 || originalRoughness <= 0) return { hp: hpSamples, torque: torqueSamples };
+
+  let originalPeakIndex = peakIndex(hpSamples);
+  let bestStrict = null, bestFallback = null;
+  let windows = [3, 5, 7, 9, 11];
+  let amounts = [20, 30, 40, 50, 60, 70, 80];
+
+  windows.forEach(windowSize => {
+    amounts.forEach(amount => {
+      let torque = smoothTorqueCurve(torqueSamples, amount, windowSize);
+      let dyno = dynoFromTorque(labels, torque, targetPeakHP);
+      let hpError = hpShapeError(hpSamples, dyno.hp);
+      let roughness = curveRoughness(dyno.torque);
+      let roughnessRatio = roughness / originalRoughness;
+      let peakShift = Math.abs(peakIndex(dyno.hp) - originalPeakIndex) / Math.max(1, labels.length - 1);
+      let fallbackScore = (hpError * 2.4) + (peakShift * 1.8) + (roughnessRatio * 0.35);
+      let candidate = { hp: dyno.hp, torque: dyno.torque, hpError, peakShift, roughness, fallbackScore };
+
+      if(hpError <= 0.045 && peakShift <= 0.035) {
+        if(!bestStrict || roughness < bestStrict.roughness || (roughness === bestStrict.roughness && hpError < bestStrict.hpError)) {
+          bestStrict = candidate;
+        }
+      }
+      if(!bestFallback || fallbackScore < bestFallback.fallbackScore) bestFallback = candidate;
+    });
+  });
+
+  let best = bestStrict || bestFallback;
+  if(!best || best.roughness >= originalRoughness * 0.98) return { hp: hpSamples, torque: torqueSamples };
+  return { hp: best.hp, torque: best.torque };
+}
+
+function calcCombustionDynoSamples(overrides = {}) {
+  let hp = v('hp'), peak = overrides.peak || v('peakrpm'), redline = v('redline'), cr = v('cr');
+  let tEn = chk('turbo-en'), tc = tEn ? v('tcount') : 0, tb = tEn ? v('tboost') : 0;
+  let sEn = chk('super-en'), sc = sEn ? v('scount') : 0, sb = sEn ? v('sboost') : 0;
+  let sharp = overrides.sharp || v('sharp') || 6.5, cm = overrides.curveMult || v('curvemult') || 0.2;
+  let TPsi = tb * tc, SPsi = sb * sc;
+  let HTc = ((hp * TPsi * (cr / 10) / 7.5) / 2) / 100;
+  let HSc = ((hp * SPsi * (cr / 10) / 7.5) / 2) / 100;
+  let HT = HTc * 100, HS = HSc * 100;
+  let peakNA = Math.max(0.0001, curveNfull(peak, hp, peak, sharp, cm));
+  let steps = 80, labels = [], hpSamples = [], torqueSamples = [];
+
+  for(let i = 0; i <= steps; i++) {
+    let rpm = redline * i / steps;
+    labels.push(Math.round(rpm));
+    let naR = Math.max(0, curveNfull(rpm, hp, peak, sharp, cm));
+    let naHP = (naR / peakNA) * hp;
+    let tR = Math.max(0, curveNfull(rpm, Math.max(1, HTc * 100), peak, sharp, cm));
+    let tHP = (tEn && tc > 0) ? (tR / peakNA) * HT : 0;
+    let sR = Math.max(0, curveNfull(rpm, Math.max(1, HSc * 100), peak, sharp, cm));
+    let sHP = (sEn && sc > 0) ? (sR / peakNA) * HS : 0;
+    let totalHP = Math.max(0, Math.round((naHP + tHP + sHP) * 10) / 10);
+    hpSamples.push(totalHP);
+    torqueSamples.push(rpm > 100 ? Math.round((totalHP * 5252) / rpm) : 0);
+  }
+
+  return { labels, hp: hpSamples, torque: torqueSamples };
+}
+
 function calcHP() {
   let hp = v('hp'), peak = v('peakrpm'), redline = v('redline'), cr = v('cr');
   let tEn = chk('turbo-en'), tc = tEn ? v('tcount') : 0, tb = tEn ? v('tboost') : 0;
   let sEn = chk('super-en'), sc = sEn ? v('scount') : 0, sb = sEn ? v('sboost') : 0;
   let sharp = v('sharp') || 6.5, cm = v('curvemult') || 0.2;
+  let tqSmooth = chk('torque-smooth-en');
   
   let TPsi = tb*tc, SPsi = sb*sc;
   let HTc = ((hp*TPsi*(cr/10)/7.5)/2)/100, HSc = ((hp*SPsi*(cr/10)/7.5)/2)/100;
@@ -67,19 +207,12 @@ function calcHP() {
   let fText = document.getElementById('formula-text');
   if(fText) fText.textContent = 'HP_NA='+Math.round(hp)+' HP_T='+(tEn&&tc>0?Math.round(HT):0)+' HP_S='+(sEn&&sc>0?Math.round(HS):0)+'\nTOTAL='+Math.round(hp+HT+HS)+' HP';
 
-  let steps = 80, labels = [], dTot = [], dTorque = [];
-  for(let i=0; i<=steps; i++){
-    let rpm = redline * i / steps;
-    labels.push(Math.round(rpm));
-    let naR = Math.max(0, curveNfull(rpm, hp, peak, sharp, cm)), naHP = (naR/peakNA)*hp;
-    let tR = Math.max(0, curveNfull(rpm, Math.max(1, HTc*100), peak, sharp, cm)), tHP = (tEn&&tc>0) ? (tR/peakNA)*HT : 0;
-    let sR = Math.max(0, curveNfull(rpm, Math.max(1, HSc*100), peak, sharp, cm)), sHP = (sEn&&sc>0) ? (sR/peakNA)*HS : 0;
-    
-    let totalHP = Math.max(0, Math.round((naHP + tHP + sHP)*10)/10);
-    dTot.push(totalHP);
-    
-    let torque = rpm > 100 ? Math.round((totalHP * 5252) / rpm) : 0;
-    dTorque.push(torque);
+  let samples = calcCombustionDynoSamples({ sharp, curveMult: cm, peak });
+  let labels = samples.labels, dTot = samples.hp, dTorque = samples.torque;
+  if(tqSmooth) {
+    let autoDyno = autoSmoothDynoCurve(labels, dTot, dTorque);
+    dTot = autoDyno.hp;
+    dTorque = autoDyno.torque;
   }
 
   if(window._hpChart){
@@ -110,6 +243,51 @@ function calcHP() {
       }
     });
   }
+}
+
+function fitTuneValuesToAutoDyno() {
+  let baseSharp = v('sharp') || 6.5;
+  let baseCurveMult = v('curvemult') || 0.2;
+  let basePeak = v('peakrpm');
+  let base = calcCombustionDynoSamples({ sharp: baseSharp, curveMult: baseCurveMult, peak: basePeak });
+  let target = autoSmoothDynoCurve(base.labels, base.hp, base.torque);
+  let targetPeakIndex = peakIndex(target.hp);
+  let best = null;
+
+  for(let sharpStep = 25; sharpStep <= 130; sharpStep++) {
+    let sharp = sharpStep / 10;
+    for(let curveStep = 4; curveStep <= 120; curveStep += 2) {
+      let curveMult = curveStep / 100;
+      let candidate = calcCombustionDynoSamples({ sharp, curveMult, peak: basePeak });
+      let hpError = hpShapeError(target.hp, candidate.hp);
+      let torqueError = hpShapeError(target.torque, candidate.torque);
+      let peakShift = Math.abs(peakIndex(candidate.hp) - targetPeakIndex) / Math.max(1, target.hp.length - 1);
+      let peakDiff = Math.abs(
+        candidate.hp.reduce((max, value) => Math.max(max, value), 0) -
+        target.hp.reduce((max, value) => Math.max(max, value), 0)
+      ) / Math.max(1, target.hp.reduce((max, value) => Math.max(max, value), 0));
+      let score = (hpError * 3.5) + (torqueError * 1.4) + (peakShift * 1.8) + (peakDiff * 2);
+
+      if(!best || score < best.score) {
+        best = { sharp, curveMult, hpError, torqueError, peakShift, peakDiff, score };
+      }
+    }
+  }
+
+  if(!best) {
+    showToast('Não foi possível otimizar a curva.', 'error');
+    return;
+  }
+
+  document.getElementById('sharp').value = best.sharp.toFixed(1);
+  document.getElementById('curvemult').value = best.curveMult.toFixed(2);
+
+  let status = document.getElementById('fit-torque-values-status');
+  if(status) {
+    status.textContent = 'Aplicado: PeakSharpness ' + best.sharp.toFixed(1) + ' · CurveMult ' + best.curveMult.toFixed(2) + ' · erro HP ' + (best.hpError * 100).toFixed(1) + '%. A prévia automática continua como você deixou.';
+  }
+  calc();
+  showToast('Valores AC6 ajustados para aproximar a curva realista.', 'success');
 }
 
 function calcPW() {
@@ -329,6 +507,8 @@ document.querySelectorAll('input, select').forEach(el => {
   el.addEventListener('input', calc);
   el.addEventListener('change', calc);
 });
+let fitTorqueValuesBtn = document.getElementById('fit-torque-values-btn');
+if(fitTorqueValuesBtn) fitTorqueValuesBtn.addEventListener('click', fitTuneValuesToAutoDyno);
 calcCore();
 
 /* Toggle Pills */
@@ -343,6 +523,7 @@ function bindToggle(cbId, pillId) {
   });
 }
 bindToggle('turbo-en','turbo-pill'); bindToggle('super-en','super-pill'); bindToggle('engine-en','engine-pill');
+bindToggle('torque-smooth-en','torque-smooth-pill');
 bindToggle('clutch-en','clutch-pill'); bindToggle('abs-en','abs-pill'); bindToggle('tcs-en','tcs-pill');
 bindToggle('ck-en','ck-pill'); bindToggle('elec-en','elec-pill');
 

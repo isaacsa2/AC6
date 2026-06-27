@@ -129,6 +129,16 @@
               <div class="field"><label>S_Sensitivity</label><input type="number" data-tune="S_Sensitivity" id="ssens" value="2"></div>
             </div>
           </div>
+          <div class="card">
+            <p class="card-title">Suavização de Torque</p>
+            <div class="toggle-row">
+              <label class="toggle-label"><label class="switch"><input type="checkbox" id="torque-smooth-en" checked><span class="slider-sw"></span></label>Modo automático realista</label>
+              <span class="pill pill-on" id="torque-smooth-pill">ON</span>
+            </div>
+            <button class="btn btn-outline" id="fit-torque-values-btn" type="button">Aplicar nos valores AC6</button>
+            <p class="field-note" id="fit-torque-values-status"></p>
+            <p class="field-note">Testa suavizações do torque, recalcula HP pela relação Torque × RPM e escolhe a curva que reduz serrilhado sem afastar o pico e o desenho da HP.</p>
+          </div>
         </div>
       </div>
 
