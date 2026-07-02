@@ -6,6 +6,60 @@ const IS_BYINSPARE = CHASSIS_VARIANT.toLowerCase() === 'byinspare';
 const STORAGE_KEY = IS_BYINSPARE ? 'ac6_byinspare_saved_tune' : 'ac6c_saved_tune';
 let chassisTemplateSource = '';
 
+function hideElement(el) {
+  if(el) el.style.display = 'none';
+}
+
+function hideFieldByTuneKey(key) {
+  document.querySelectorAll('[data-tune="' + key + '"]').forEach(el => hideElement(el.closest('.field') || el.closest('.toggle-row') || el));
+}
+
+function hideCardByTitle(title) {
+  document.querySelectorAll('.card-title').forEach(el => {
+    if(el.textContent.trim().toLowerCase() === title.toLowerCase()) hideElement(el.closest('.card'));
+  });
+}
+
+function setupByInspareUi() {
+  if(!IS_BYINSPARE) return;
+
+  ['electric', 'engswitch'].forEach(tab => {
+    hideElement(document.querySelector('.nav-item[data-tab="' + tab + '"]'));
+    hideElement(document.querySelector('.tab-panel[data-panel="' + tab + '"]'));
+  });
+
+  hideCardByTitle('Turbocharger');
+  hideCardByTitle('Supercharger');
+  hideCardByTitle('Suavização de Torque');
+  hideCardByTitle('Embreagem');
+  hideCardByTitle('4WS & Raio de Giro');
+
+  [
+    'Engine', 'CompressionRatio', 'Flywheel',
+    'Turbochargers', 'T_Boost', 'T_BoostLag', 'Superchargers', 'S_Boost', 'S_Sensitivity',
+    'Electric', 'E_Redline', 'E_Trans1', 'E_Trans2', 'E_Horsepower', 'EH_FrontMult', 'EH_EndMult',
+    'EH_EndPercent', 'E_Torque', 'ET_EndMult', 'ET_EndPercent',
+    'DifferentialType', 'TorqueVector', 'FDiffPower', 'FDiffCoast', 'FDiffPreload',
+    'RDiffPower', 'RDiffCoast', 'RDiffPreload',
+    'Clutch', 'Stall', 'ClutchType', 'ClutchMode', 'ClutchEngage', 'SpeedEngage',
+    'ClutchKick', 'KickMult', 'KickSpeedThreshold', 'KickRPMThreshold', 'ClutchRPMMult',
+    'RPMEngage', 'NeutralLimit', 'NeutralRevRPM', 'LimitClutch',
+    'AutoShiftType', 'AutoShiftVers', 'ShiftThrot', 'ShiftUpTime', 'ShiftDnTime',
+    'PBrakeBias', 'EBrakeForce', 'BrakeAccel', 'BrakeDecel',
+    'SteeringType', 'LockToLock', 'SteerRatio', 'Ackerman',
+    'FWSteer', 'RSteerOuter', 'RSteerInner', 'RSteerSpeed', 'RSteerDecay',
+    'FCaster', 'RCaster'
+  ].forEach(hideFieldByTuneKey);
+
+  let clutchPanel = document.querySelector('.tab-panel[data-panel="drivetrain-clutch"] .grid2');
+  if(clutchPanel) clutchPanel.style.gridTemplateColumns = '1fr';
+
+  let exportStatus = document.querySelector('.export-status');
+  if(exportStatus) exportStatus.textContent = 'Gera apenas os campos existentes no AC6 byInspare';
+}
+
+setupByInspareUi();
+
 function v(id){ let e = document.getElementById(id); return e ? (parseFloat(e.value)||0) : 0; }
 function s(id){ let e = document.getElementById(id); return e ? e.value : ''; }
 function chk(id){ let e = document.getElementById(id); return e ? e.checked : false; }
@@ -978,7 +1032,7 @@ const dict = {
     extras: 'Extras & Misc',
     engineSub: 'Curva de potência · torque no dyno',
     exportStatusIsaac: 'Gera o A-Chassis Tune pronto pro Roblox',
-    exportStatusInspare: 'Gera o Tune no formato AC6 byInspare pronto pro Roblox',
+    exportStatusInspare: 'Gera só os campos que existem no AC6 byInspare',
     templateError: 'Não consegui carregar o template byInspare em public/chassis.',
     invalidTune: 'Link de tune inválido.',
     tuneFromLink: 'Tune importado pelo Link!',
@@ -1011,7 +1065,7 @@ const dict = {
     extras: 'Extras & Misc',
     engineSub: 'Power curve · dyno torque',
     exportStatusIsaac: 'Generates the A-Chassis Tune ready for Roblox',
-    exportStatusInspare: 'Generates the Tune in AC6 byInspare format ready for Roblox',
+    exportStatusInspare: 'Generates only fields that exist in AC6 byInspare',
     templateError: 'Could not load the byInspare template in public/chassis.',
     invalidTune: 'Invalid tune link.',
     tuneFromLink: 'Tune imported from link!',
