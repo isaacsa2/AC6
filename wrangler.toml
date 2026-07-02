@@ -1,7 +1,7 @@
 name = "ac6"
 main = "worker.js"
 compatibility_date = "2025-01-01"
-
+workers_dev = false
 [assets]
 directory = "./public"
 binding = "ASSETS"
