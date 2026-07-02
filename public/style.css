@@ -182,6 +182,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); disp
 
 /* === BUTTONS === */
 .btn { font-size: 0.8rem; font-weight: 500; border-radius: var(--radius); padding: 8px 18px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; font-family: var(--sans); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-link { text-decoration: none; }
 .btn-amber { background: var(--amber); color: #000; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); }
 .btn-amber:hover { background: var(--amber2); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3); }
 .btn-amber:active { transform: translateY(1px); }

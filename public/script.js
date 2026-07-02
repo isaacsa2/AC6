@@ -1,6 +1,10 @@
 /* ─────────── GLOBALS & UTILS ─────────── */
 let USE_KMH = true;
 let currentLang = 'pt';
+const CHASSIS_VARIANT = document.body?.dataset.chassisVariant || 'byisaacsa2';
+const IS_BYINSPARE = CHASSIS_VARIANT.toLowerCase() === 'byinspare';
+const STORAGE_KEY = IS_BYINSPARE ? 'ac6_byinspare_saved_tune' : 'ac6c_saved_tune';
+let chassisTemplateSource = '';
 
 function v(id){ let e = document.getElementById(id); return e ? (parseFloat(e.value)||0) : 0; }
 function s(id){ let e = document.getElementById(id); return e ? e.value : ''; }
@@ -631,7 +635,66 @@ document.getElementById('es-apply-sw-btn').addEventListener('click', () => {
 
 /* Export Lua */
 function luaN(n){ return Number.isInteger(n) ? String(n) : String(Math.round(n*1000)/1000); }
+function tuneLineValue(value) {
+  if(typeof value === 'boolean') return value ? 'true' : 'false';
+  if(typeof value === 'string') return '"' + value + '"';
+  return luaN(value);
+}
+
+function collectTuneValues() {
+  let vals = {};
+  document.querySelectorAll('[data-tune]').forEach(el => {
+    let k = el.dataset.tune;
+    if(vals[k] !== undefined) return;
+    if(el.dataset.tuneBool !== undefined) vals[k] = el.checked;
+    else if(el.dataset.tuneStr !== undefined) vals[k] = el.value;
+    else vals[k] = parseFloat(el.value) || 0;
+  });
+  return vals;
+}
+
+function replaceTuneLine(source, key, value) {
+  let escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let re = new RegExp('(^[\\t ]*Tune\\.' + escaped + '[\\t ]*=[\\t ]*)([^\\r\\n]*?)([\\t ]*(?:--.*)?$)', 'm');
+  if(!re.test(source)) return source;
+  return source.replace(re, (_, prefix, _oldValue, suffix) => prefix + tuneLineValue(value) + suffix);
+}
+
+function buildRatiosBlock() {
+  let rR = v('dt-ratio-r');
+  let rats = document.getElementById('dt-ratios').value.split(',').map(x => parseFloat(x.trim())).filter(n => !isNaN(n) && n > 0);
+  let ratBlock = 'Tune.Ratios\t\t\t= {\n\t--[[Reverse]]\t' + luaN(rR) + '\t,\n\t--[[Neutral]]\t0\t,\n';
+  rats.forEach((r, i) => ratBlock += '\t--[[' + (i + 1) + ']]\t\t' + luaN(r) + '\t,\n');
+  ratBlock += '}';
+  return ratBlock;
+}
+
+function buildByInspareLua() {
+  let source = chassisTemplateSource || '';
+  if(!source) return buildLuaIsaacsa2();
+
+  let vals = collectTuneValues();
+  vals.SusEnabled = true;
+  vals.TCSGradient = 20;
+  vals.FBrakeForce = Math.round(v('bk-force') * (v('bk-bias') / 100));
+  vals.RBrakeForce = Math.round(v('bk-force') * (1 - (v('bk-bias') / 100)));
+  vals.PBrakeForce = v('bk-pforce');
+
+  Object.keys(vals).forEach(key => {
+    if(key === 'Ratios' || key === 'BrakeForce' || key === 'BrakeBias') return;
+    source = replaceTuneLine(source, key, vals[key]);
+  });
+
+  source = source.replace(/Tune\.Ratios\s*=\s*\{[\s\S]*?\n\}/, buildRatiosBlock());
+  return source;
+}
+
 function buildLua() {
+  if(IS_BYINSPARE) return buildByInspareLua();
+  return buildLuaIsaacsa2();
+}
+
+function buildLuaIsaacsa2() {
   let vals={};
   document.querySelectorAll('[data-tune]').forEach(el => {
     let k = el.dataset.tune;
@@ -750,9 +813,7 @@ const KM={'Horsepower':'hp','PeakRPM':'peakrpm','Redline':'redline','Compression
 const KB={'Engine':'engine-en','ABSEnabled':'abs-en','TCSEnabled':'tcs-en','Clutch':'clutch-en','Stall':'stall-en','ClutchKick':'ck-en','Electric':'elec-en','AutoFlip':'autoflip-en','AutoStart':'autostart-en','NeutralLimit':'neutrallimit-en','LimitClutch':'limitclutch-en'};
 const KS={'AutoShiftType':'autoshifttype','AutoShiftVers':'autoshiftvers','AutoShiftMode':'autoshiftmode','ClutchType':'clutchtype','ClutchMode':'clutchmode','DifferentialType':'difftype','Config':'diffconfig','SteeringType':'steeringtype','FWSteer':'fwsteer'};
 
-document.getElementById('import-apply-btn').addEventListener('click', () => {
-  let txt = impTA.value;
-  if(!txt.trim()){ impSt.textContent='✗ Cole ou carregue um Tune'; impSt.className='import-status err'; impSt.style.display=''; return; }
+function applyTuneTextToForm(txt) {
   let applied = 0;
   
   let ratBlock = txt.match(/Tune\.Ratios\s*=\s*\{([\s\S]*?)\}/);
@@ -763,6 +824,19 @@ document.getElementById('import-apply-btn').addEventListener('click', () => {
       document.getElementById('dt-ratio-r').value = ns[0];
       document.getElementById('dt-ratios').value = ns.slice(2).join(', ');
       applied++;
+    }
+  }
+
+  let fBrake = txt.match(/Tune\.FBrakeForce\s*=\s*([.\d]+)/);
+  let rBrake = txt.match(/Tune\.RBrakeForce\s*=\s*([.\d]+)/);
+  if(fBrake && rBrake) {
+    let f = parseFloat(fBrake[1]) || 0;
+    let r = parseFloat(rBrake[1]) || 0;
+    let total = f + r;
+    if(total > 0) {
+      document.getElementById('bk-force').value = Math.round(total);
+      document.getElementById('bk-bias').value = Math.round((f / total) * 100);
+      applied += 2;
     }
   }
   
@@ -785,6 +859,13 @@ document.getElementById('import-apply-btn').addEventListener('click', () => {
   });
   
   calc();
+  return applied;
+}
+
+document.getElementById('import-apply-btn').addEventListener('click', () => {
+  let txt = impTA.value;
+  if(!txt.trim()){ impSt.textContent='✗ Cole ou carregue um Tune'; impSt.className='import-status err'; impSt.style.display=''; return; }
+  let applied = applyTuneTextToForm(txt);
   if(applied > 0) {
     showToast(`${applied} campos aplicados!`, 'success');
     setTimeout(() => impBack.classList.remove('open'), 700);
@@ -792,6 +873,22 @@ document.getElementById('import-apply-btn').addEventListener('click', () => {
     showToast('Nenhum campo reconhecido.', 'error');
   }
 });
+
+if(IS_BYINSPARE) {
+  window.addEventListener('DOMContentLoaded', () => {
+    fetch('/chassis/AC6byInspareTUNE.luau')
+      .then(resp => resp.ok ? resp.text() : Promise.reject(new Error('HTTP ' + resp.status)))
+      .then(txt => {
+        chassisTemplateSource = txt;
+        applyTuneTextToForm(txt);
+        let status = document.querySelector('.export-status');
+        if(status) status.textContent = 'Gera o Tune no formato AC6 byInspare pronto pro Roblox';
+      })
+      .catch(() => {
+        showToast('Nao consegui carregar o template byInspare em public/chassis.', 'error');
+      });
+  });
+}
 
 /* ─────────── LOCAL STORAGE & SHARE URL ─────────── */
 function getFormValues() {
@@ -819,12 +916,12 @@ function setFormValues(data) {
 }
 
 document.getElementById('save-local-btn').addEventListener('click', () => {
-  localStorage.setItem('ac6c_saved_tune', JSON.stringify(getFormValues()));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(getFormValues()));
   showToast('Tune salvo na garagem local!', 'success');
 });
 
 document.getElementById('load-local-btn').addEventListener('click', () => {
-  let saved = localStorage.getItem('ac6c_saved_tune');
+  let saved = localStorage.getItem(STORAGE_KEY);
   if(saved) {
     setFormValues(JSON.parse(saved));
     showToast('Tune carregado com sucesso!', 'success');
