@@ -881,11 +881,10 @@ if(IS_BYINSPARE) {
       .then(txt => {
         chassisTemplateSource = txt;
         applyTuneTextToForm(txt);
-        let status = document.querySelector('.export-status');
-        if(status) status.textContent = 'Gera o Tune no formato AC6 byInspare pronto pro Roblox';
+        applyLanguage(false);
       })
       .catch(() => {
-        showToast('Nao consegui carregar o template byInspare em public/chassis.', 'error');
+        showToast(tr('templateError'), 'error');
       });
   });
 }
@@ -917,16 +916,16 @@ function setFormValues(data) {
 
 document.getElementById('save-local-btn').addEventListener('click', () => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(getFormValues()));
-  showToast('Tune salvo na garagem local!', 'success');
+  showToast(tr('saved'), 'success');
 });
 
 document.getElementById('load-local-btn').addEventListener('click', () => {
   let saved = localStorage.getItem(STORAGE_KEY);
   if(saved) {
     setFormValues(JSON.parse(saved));
-    showToast('Tune carregado com sucesso!', 'success');
+    showToast(tr('loaded'), 'success');
   } else {
-    showToast('Nenhum tune salvo encontrado.', 'error');
+    showToast(tr('noSavedTune'), 'error');
   }
 });
 
@@ -934,7 +933,7 @@ document.getElementById('share-url-btn').addEventListener('click', () => {
   let base64 = btoa(JSON.stringify(getFormValues()));
   let url = window.location.origin + window.location.pathname + '?tune=' + base64;
   navigator.clipboard.writeText(url).then(() => {
-    showToast('Link copiado para a área de transferência!', 'success');
+    showToast(tr('linkCopied'), 'success');
   });
 });
 
@@ -944,29 +943,111 @@ window.addEventListener('DOMContentLoaded', () => {
   if(tuneData) {
     try {
       setFormValues(JSON.parse(atob(tuneData)));
-      showToast('Tune importado pelo Link!', 'success');
+      showToast(tr('tuneFromLink'), 'success');
       window.history.replaceState(null, '', window.location.pathname);
     } catch(e) {
-      showToast('Link de tune inválido.', 'error');
+      showToast(tr('invalidTune'), 'error');
     }
   }
 });
 
 /* ─────────── TRADUÇÃO (i18n) ─────────── */
+const LANG_KEY = STORAGE_KEY + '_lang';
 const dict = {
-  'pt': { 'config': 'Configuração', 'file': 'Arquivo', 'import': 'Importar Tune', 'export': 'Exportar Lua', 'speed': 'Velocidade:', 'save': '💾 Salvar Local', 'load': '📂 Carregar', 'share': '🔗 Compartilhar Link', 'engine': 'Motor' },
-  'en': { 'config': 'Configuration', 'file': 'File', 'import': 'Import Tune', 'export': 'Export Lua', 'speed': 'Speed Unit:', 'save': '💾 Save Local', 'load': '📂 Load', 'share': '🔗 Share Link', 'engine': 'Engine' }
+  pt: {
+    htmlLang: 'pt-BR',
+    switchLabel: '🇺🇸 EN-US',
+    changed: 'Idioma alterado para PT-BR',
+    titleSuffix: 'Tune Maker',
+    config: 'Configuração',
+    file: 'Arquivo',
+    import: 'Importar Tune',
+    export: 'Exportar Lua',
+    speed: 'Velocidade:',
+    save: '💾 Salvar Local',
+    load: '📂 Carregar',
+    share: '🔗 Compartilhar Link',
+    engine: 'Motor',
+    transmission: 'Câmbio & Embreagem',
+    diff: 'Diferencial',
+    weight: 'Peso & Suspensão',
+    drivetrain: 'Drivetrain',
+    brakes: 'Freios',
+    steering: 'Direção',
+    electric: 'Motor Elétrico',
+    extras: 'Extras & Misc',
+    engineSub: 'Curva de potência · torque no dyno',
+    exportStatusIsaac: 'Gera o A-Chassis Tune pronto pro Roblox',
+    exportStatusInspare: 'Gera o Tune no formato AC6 byInspare pronto pro Roblox',
+    templateError: 'Não consegui carregar o template byInspare em public/chassis.',
+    invalidTune: 'Link de tune inválido.',
+    tuneFromLink: 'Tune importado pelo Link!',
+    saved: 'Tune salvo na garagem local!',
+    loaded: 'Tune carregado com sucesso!',
+    noSavedTune: 'Nenhum tune salvo encontrado.',
+    linkCopied: 'Link copiado para a área de transferência!'
+  },
+  en: {
+    htmlLang: 'en-US',
+    switchLabel: '🇧🇷 PT-BR',
+    changed: 'Language changed to EN-US',
+    titleSuffix: 'Tune Maker',
+    config: 'Configuration',
+    file: 'File',
+    import: 'Import Tune',
+    export: 'Export Lua',
+    speed: 'Speed:',
+    save: '💾 Save Local',
+    load: '📂 Load',
+    share: '🔗 Share Link',
+    engine: 'Engine',
+    transmission: 'Transmission & Clutch',
+    diff: 'Differential',
+    weight: 'Weight & Suspension',
+    drivetrain: 'Drivetrain',
+    brakes: 'Brakes',
+    steering: 'Steering',
+    electric: 'Electric Motor',
+    extras: 'Extras & Misc',
+    engineSub: 'Power curve · dyno torque',
+    exportStatusIsaac: 'Generates the A-Chassis Tune ready for Roblox',
+    exportStatusInspare: 'Generates the Tune in AC6 byInspare format ready for Roblox',
+    templateError: 'Could not load the byInspare template in public/chassis.',
+    invalidTune: 'Invalid tune link.',
+    tuneFromLink: 'Tune imported from link!',
+    saved: 'Tune saved locally!',
+    loaded: 'Tune loaded successfully!',
+    noSavedTune: 'No saved tune found.',
+    linkCopied: 'Link copied to clipboard!'
+  }
 };
 
-document.getElementById('lang-btn').addEventListener('click', (e) => {
-  currentLang = currentLang === 'pt' ? 'en' : 'pt';
-  e.target.textContent = currentLang === 'pt' ? '🇺🇸 EN-US' : '🇧🇷 PT-BR';
+function tr(key) {
+  return (dict[currentLang] && dict[currentLang][key]) || dict.pt[key] || key;
+}
+
+function applyLanguage(showMessage = false) {
+  document.documentElement.lang = tr('htmlLang');
+  document.title = (IS_BYINSPARE ? 'AC6 byInspare' : 'AC6C') + ' — ' + tr('titleSuffix');
+  let langBtn = document.getElementById('lang-btn');
+  if(langBtn) langBtn.textContent = tr('switchLabel');
   document.querySelectorAll('[data-i18n]').forEach(el => {
     let key = el.getAttribute('data-i18n');
-    if(dict[currentLang][key]) el.textContent = dict[currentLang][key];
+    if(dict[currentLang][key]) el.textContent = tr(key);
   });
-  showToast(`Idioma alterado para ${currentLang.toUpperCase()}`);
+  let status = document.querySelector('.export-status');
+  if(status) status.textContent = IS_BYINSPARE ? tr('exportStatusInspare') : tr('exportStatusIsaac');
+  localStorage.setItem(LANG_KEY, currentLang);
+  if(showMessage) showToast(tr('changed'));
+}
+
+document.getElementById('lang-btn').addEventListener('click', () => {
+  currentLang = currentLang === 'pt' ? 'en' : 'pt';
+  applyLanguage(true);
 });
+
+currentLang = localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'pt';
+applyLanguage(false);
 
 /* ─────────── UI INTERACTIONS ─────────── */
 document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
