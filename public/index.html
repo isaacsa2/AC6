@@ -137,9 +137,17 @@
               <label class="toggle-label"><label class="switch"><input type="checkbox" id="torque-smooth-en" checked><span class="slider-sw"></span></label>Modo automático realista</label>
               <span class="pill pill-on" id="torque-smooth-pill">ON</span>
             </div>
+            <div class="field-group" style="margin:.75rem 0">
+              <div class="field"><label>Perfil</label><select id="torque-fit-profile"><option value="balanced">Equilibrado</option><option value="smooth">Mais suave</option><option value="responsive">Mais resposta</option></select></div>
+              <div class="field"><label>Vel. alvo (<span class="spd-unit">km/h</span>)</label><input type="number" id="speed-fit-target" value="120"></div>
+            </div>
+            <div class="toggle-row">
+              <label class="toggle-label"><label class="switch"><input type="checkbox" id="speed-fit-en"><span class="slider-sw"></span></label>Ajustar FinalDrive para velocidade alvo</label>
+              <span class="pill pill-off" id="speed-fit-pill">OFF</span>
+            </div>
             <button class="btn btn-outline" id="fit-torque-values-btn" type="button">Aplicar nos valores AC6</button>
             <p class="field-note" id="fit-torque-values-status"></p>
-            <p class="field-note">Testa suavizações do torque, recalcula HP pela relação Torque × RPM e escolhe a curva que reduz serrilhado sem afastar o pico e o desenho da HP.</p>
+            <p class="field-note">Ajusta PeakSharpness/CurveMult para suavizar torque sem deformar HP. Opcionalmente recalcula o FinalDrive para bater a velocidade alvo.</p>
           </div>
         </div>
       </div>
@@ -511,6 +519,23 @@
         <div class="metric metric-green"><p class="lbl">HP combinado total</p><p class="val" id="elec-combined" style="font-size:1.1rem">—</p><p class="sub">combustão + elétrico</p></div>
         <div class="metric"><p class="lbl">Modo</p><p class="val" id="elec-mode" style="font-size:.85rem;color:var(--text2)">—</p><p class="sub">Engine + Electric</p></div>
       </div>
+      <div class="card" style="margin-top:.85rem">
+        <p class="card-title">Elétrico do zero</p>
+        <div class="field-group">
+          <div class="field"><label>Peak RPM elétrico</label><input type="number" id="e-build-peakrpm" value="7000"></div>
+          <div class="field"><label>Vel. máx alvo (<span class="spd-unit">km/h</span>)</label><input type="number" id="e-build-vmax" value="120"></div>
+          <div class="field"><label>0–100 <span class="spd-unit">km/h</span> alvo (s)</label><input type="number" id="e-build-t100" value="6" step="0.1"></div>
+          <div class="field"><label>HP máximo</label><input type="number" id="e-build-hplimit" value="300"></div>
+        </div>
+        <div class="sus-results" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin:.85rem 0">
+          <div class="metric metric-blue"><p class="lbl">E_Redline</p><p class="val" id="e-build-redline-out">—</p><p class="sub">velocidade alvo</p></div>
+          <div class="metric metric-blue"><p class="lbl">E_Trans1</p><p class="val" id="e-build-trans1-out">—</p><p class="sub">início do platô</p></div>
+          <div class="metric metric-blue"><p class="lbl">E_Trans2</p><p class="val" id="e-build-trans2-out">—</p><p class="sub">PeakRPM elétrico</p></div>
+          <div class="metric metric-green"><p class="lbl">E_Horsepower</p><p class="val" id="e-build-hp-out">—</p><p class="sub">alvo 0–100</p></div>
+          <div class="metric metric-green"><p class="lbl">E_Torque</p><p class="val" id="e-build-tq-out">—</p><p class="sub">casado com Trans1</p></div>
+        </div>
+        <button class="btn btn-amber" id="e-build-apply-btn" type="button">Gerar e aplicar elétrico</button>
+      </div>
     </div>
 
     <!-- ══ EXTRAS & MISC ══ -->
@@ -608,7 +633,8 @@
       <div class="section-label">Calculadora — motor elétrico ideal</div>
       <div class="card" style="margin-bottom:.75rem">
         <p class="card-title">Alvos de performance (modo elétrico puro)</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem;margin-bottom:.75rem">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.65rem;margin-bottom:.75rem">
+          <div class="field"><label>Peak RPM elétrico</label><input type="number" id="es-peakrpm" value="7000"></div>
           <div class="field"><label>Vel. máx elétrica (<span class="spd-unit">km/h</span>)</label><input type="number" id="es-vmax" value="120"></div>
           <div class="field"><label>0–100 <span class="spd-unit">km/h</span> alvo (s)</label><input type="number" id="es-t100" value="6" step="0.1"></div>
           <div class="field"><label>ELECTRIC_HP_LIMIT</label><input type="number" id="es-hplimit" value="300"></div>

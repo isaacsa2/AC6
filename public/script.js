@@ -172,6 +172,35 @@ function chk(id){ let e = document.getElementById(id); return e ? e.checked : fa
 function spd(mph){ return USE_KMH ? mph*1.60934 : mph; }
 function spdLabel(){ return USE_KMH ? 'km/h' : 'mph'; }
 function spdFmt(mph, dp){ return spd(mph).toFixed(dp!==undefined?dp:1)+' '+spdLabel(); }
+const SPD_SCALE = (10/12)*(60/88);
+
+function getGearSetup() {
+  let ratiosEl = document.getElementById('dt-ratios');
+  let ratios = ratiosEl ? ratiosEl.value.split(',').map(x => parseFloat(x.trim())).filter(n => !isNaN(n) && n > 0) : [];
+  return {
+    fd: Math.max(0.001, v('dt-finaldrive')),
+    fdMult: Math.max(0.001, v('dt-fdmult')),
+    wheelDiameter: Math.max(0.1, v('dt-wdia-x')),
+    lastRatio: ratios.length ? ratios[ratios.length - 1] : 1,
+    ratios
+  };
+}
+
+function speedMphFromRedline(redline, ratio, finalDrive, wheelDiameter) {
+  let wheelRpm = redline / Math.max(0.001, ratio * finalDrive);
+  let wheelRadS = wheelRpm * 2 * Math.PI / 60;
+  return wheelRadS * (wheelDiameter / 2) * SPD_SCALE;
+}
+
+function redlineForSpeedMph(speedMph, ratio, finalDrive, wheelDiameter) {
+  let wheelRpm = speedMph / Math.max(0.001, SPD_SCALE * (wheelDiameter / 2)) * 60 / (2 * Math.PI);
+  return wheelRpm * ratio * finalDrive;
+}
+
+function finalDriveForSpeedMph(speedMph, redline, ratio, fdMult, wheelDiameter) {
+  let wheelRpm = speedMph / Math.max(0.001, SPD_SCALE * (wheelDiameter / 2)) * 60 / (2 * Math.PI);
+  return redline / Math.max(0.001, wheelRpm * ratio * fdMult);
+}
 
 function refreshUnitLabels(){
   document.querySelectorAll('.spd-unit').forEach(el => el.textContent = spdLabel());
@@ -412,6 +441,12 @@ function fitTuneValuesToAutoDyno() {
   let baseSharp = v('sharp') || 6.5;
   let baseCurveMult = v('curvemult') || 0.2;
   let basePeak = v('peakrpm');
+  let profile = s('torque-fit-profile') || 'balanced';
+  let profileCfg = {
+    smooth: { hp: 2.8, torque: 2.4, peak: 1.3, peakDiff: 1.6 },
+    balanced: { hp: 3.5, torque: 1.4, peak: 1.8, peakDiff: 2 },
+    responsive: { hp: 4.2, torque: .9, peak: 2.4, peakDiff: 2.4 }
+  }[profile] || { hp: 3.5, torque: 1.4, peak: 1.8, peakDiff: 2 };
   let base = calcCombustionDynoSamples({ sharp: baseSharp, curveMult: baseCurveMult, peak: basePeak });
   let target = autoSmoothDynoCurve(base.labels, base.hp, base.torque);
   let targetPeakIndex = peakIndex(target.hp);
@@ -429,7 +464,7 @@ function fitTuneValuesToAutoDyno() {
         candidate.hp.reduce((max, value) => Math.max(max, value), 0) -
         target.hp.reduce((max, value) => Math.max(max, value), 0)
       ) / Math.max(1, target.hp.reduce((max, value) => Math.max(max, value), 0));
-      let score = (hpError * 3.5) + (torqueError * 1.4) + (peakShift * 1.8) + (peakDiff * 2);
+      let score = (hpError * profileCfg.hp) + (torqueError * profileCfg.torque) + (peakShift * profileCfg.peak) + (peakDiff * profileCfg.peakDiff);
 
       if(!best || score < best.score) {
         best = { sharp, curveMult, hpError, torqueError, peakShift, peakDiff, score };
@@ -444,13 +479,26 @@ function fitTuneValuesToAutoDyno() {
 
   document.getElementById('sharp').value = best.sharp.toFixed(1);
   document.getElementById('curvemult').value = best.curveMult.toFixed(2);
+  let speedMsg = '';
+  if(chk('speed-fit-en')) {
+    let targetSpeed = v('speed-fit-target');
+    if(targetSpeed > 0) {
+      let targetMph = USE_KMH ? targetSpeed / 1.60934 : targetSpeed;
+      let gear = getGearSetup();
+      let newFd = finalDriveForSpeedMph(targetMph, v('redline'), gear.lastRatio, gear.fdMult, gear.wheelDiameter);
+      if(Number.isFinite(newFd) && newFd > 0) {
+        document.getElementById('dt-finaldrive').value = newFd.toFixed(2);
+        speedMsg = ' · FinalDrive ' + newFd.toFixed(2) + ' para ' + targetSpeed.toFixed(0) + ' ' + spdLabel();
+      }
+    }
+  }
 
   let status = document.getElementById('fit-torque-values-status');
   if(status) {
-    status.textContent = 'Aplicado: PeakSharpness ' + best.sharp.toFixed(1) + ' · CurveMult ' + best.curveMult.toFixed(2) + ' · erro HP ' + (best.hpError * 100).toFixed(1) + '%. A prévia automática continua como você deixou.';
+    status.textContent = 'Aplicado: PeakSharpness ' + best.sharp.toFixed(1) + ' · CurveMult ' + best.curveMult.toFixed(2) + speedMsg + ' · erro HP ' + (best.hpError * 100).toFixed(1) + '%.';
   }
   calc();
-  showToast('Valores AC6 ajustados para aproximar a curva realista.', 'success');
+  showToast('Torque e velocidade ajustados nos valores AC6.', 'success');
 }
 
 function calcPW() {
@@ -687,6 +735,7 @@ function bindToggle(cbId, pillId) {
 }
 bindToggle('turbo-en','turbo-pill'); bindToggle('super-en','super-pill'); bindToggle('engine-en','engine-pill');
 bindToggle('torque-smooth-en','torque-smooth-pill');
+bindToggle('speed-fit-en','speed-fit-pill');
 bindToggle('clutch-en','clutch-pill'); bindToggle('abs-en','abs-pill'); bindToggle('tcs-en','tcs-pill');
 bindToggle('ck-en','ck-pill'); bindToggle('elec-en','elec-pill');
 
@@ -742,55 +791,94 @@ document.getElementById('rh-calc-btn').addEventListener('click', () => {
 
 /* EngineSwitch Calc */
 let _esResult = null;
+function calculateElectricBuild(peakRpm, vmaxSpd, t100, hpLimit) {
+  let gear = getGearSetup();
+  let fFD = gear.fd * gear.fdMult;
+  let vmaxMph = USE_KMH ? vmaxSpd / 1.60934 : vmaxSpd;
+  let peak = Math.max(500, peakRpm || 7000);
+  let requiredRedline = redlineForSpeedMph(vmaxMph, gear.lastRatio, fFD, gear.wheelDiameter);
+  let eRedline = Math.round(Math.max(requiredRedline, peak * 1.12));
+  let eTrans2 = Math.round(Math.min(peak, eRedline * .92));
+  let eTrans1 = Math.round(Math.max(500, eTrans2 * .55));
+
+  let targetFtS = (USE_KMH ? 100 / 1.60934 : 60) * 1.467;
+  let massSlug = v('weight') / 32.2;
+  let eHP = Math.round((massSlug * (targetFtS / Math.max(0.1, t100)) * (targetFtS / 2)) / 550);
+  eHP = Math.max(1, Math.min(eHP, hpLimit || eHP));
+  let eTQ = Math.round((eHP * 5252) / Math.max(500, eTrans1));
+
+  let wheelRPMLow = (5 / SPD_SCALE) / ((gear.wheelDiameter / 2) * 2 * Math.PI / 60);
+  let efg = Math.round((eRedline / Math.max(0.001, wheelRPMLow * fFD)) * 10) / 10;
+  return {
+    eRedline, eTrans1, eTrans2, eHP, eTQ, efg,
+    hpLimit: hpLimit || eHP,
+    hFrontMult: 0.18,
+    hEndMult: 2.2,
+    hEndPercent: 12,
+    tEndMult: 1.8,
+    tEndPercent: 35
+  };
+}
+
+function renderElectricBuild(prefix, result) {
+  if(!result) return;
+  let set = (id, value) => {
+    let el = document.getElementById(prefix + id) || document.getElementById(prefix + id + '-out');
+    if(el) el.textContent = value;
+  };
+  set('redline', result.eRedline.toLocaleString());
+  set('trans2', result.eTrans2.toLocaleString());
+  set('trans1', result.eTrans1.toLocaleString());
+  set('hp', result.eHP);
+  set('tq', result.eTQ);
+  set('firstgear', result.efg.toFixed(1));
+}
+
+function applyElectricBuild(result, applySwitch = false) {
+  if(!result){ showToast('Calcule primeiro!', 'error'); return false; }
+  document.getElementById('e-redline').value = result.eRedline;
+  document.getElementById('e-trans1').value = result.eTrans1;
+  document.getElementById('e-trans2').value = result.eTrans2;
+  document.getElementById('e-hp').value = result.eHP;
+  document.getElementById('e-tq').value = result.eTQ;
+  document.getElementById('e-hfrontmult').value = result.hFrontMult;
+  document.getElementById('e-hendmult').value = result.hEndMult;
+  document.getElementById('e-hendpct').value = result.hEndPercent;
+  document.getElementById('e-tqendmult').value = result.tEndMult;
+  document.getElementById('e-tqendpct').value = result.tEndPercent;
+  document.getElementById('elec-en').checked = true;
+  let p = document.getElementById('elec-pill'); if(p){ p.textContent='ON'; p.className='pill pill-on'; }
+  if(applySwitch) {
+    document.getElementById('sw-firstgear').value = result.efg.toFixed(1);
+    document.getElementById('sw-hplimit').value = result.hpLimit;
+  }
+  calc();
+  return true;
+}
+
 document.getElementById('es-calc-btn').addEventListener('click', () => {
-  let fd=v('dt-finaldrive'), fm=v('dt-fdmult'), fFD=fd*fm, wDia=v('dt-wdia-x');
-  let rats=document.getElementById('dt-ratios').value.split(',').map(x=>parseFloat(x.trim())).filter(n=>!isNaN(n)&&n>0);
-  let lastRatio=rats.length>0?rats[rats.length-1]:1;
-  let wt=v('weight'), vmaxSpd=v('es-vmax'), t100=v('es-t100'), hpLimit=v('es-hplimit');
-  let vmaxMph = USE_KMH ? vmaxSpd/1.60934 : vmaxSpd;
-  const SPD_SCALE = (10/12)*(60/88);
-  
-  let eRedline = Math.round((vmaxMph/SPD_SCALE)*(60/(2*Math.PI))*(lastRatio*fFD)/(wDia/2));
-  let eTrans2 = Math.round(eRedline*0.70), eTrans1 = Math.round(eRedline*0.30);
-  
-  let targetFtS = (USE_KMH?100/1.60934:60)*1.467, massSlug = wt/32.2;
-  let eHP = Math.round((massSlug*(targetFtS/Math.max(0.1,t100))*(targetFtS/2))/550);
-  eHP = Math.min(eHP, hpLimit);
-  let eTQ = Math.round((eHP*5252)/Math.max(100,eTrans1));
-  
-  let wheelRPM_low = (5/SPD_SCALE)/((wDia/2)*2*Math.PI/60);
-  let efg = Math.round((eRedline/(wheelRPM_low*fFD))*10)/10;
-  
-  _esResult = { eRedline, eTrans1, eTrans2, eHP, eTQ, efg, hpLimit };
-  
-  document.getElementById('es-redline').textContent = eRedline.toLocaleString();
-  document.getElementById('es-trans2').textContent = eTrans2.toLocaleString();
-  document.getElementById('es-trans1').textContent = eTrans1.toLocaleString();
-  document.getElementById('es-hp').textContent = eHP;
-  document.getElementById('es-tq').textContent = eTQ;
-  document.getElementById('es-firstgear').textContent = efg.toFixed(1);
+  _esResult = calculateElectricBuild(v('es-peakrpm'), v('es-vmax'), v('es-t100'), v('es-hplimit'));
+  renderElectricBuild('es-', _esResult);
   showToast('Parâmetros elétricos calculados!', 'success');
 });
 
 document.getElementById('es-apply-btn').addEventListener('click', () => {
-  if(!_esResult){ showToast('Calcule primeiro!', 'error'); return; }
-  document.getElementById('e-redline').value = _esResult.eRedline;
-  document.getElementById('e-trans1').value = _esResult.eTrans1;
-  document.getElementById('e-trans2').value = _esResult.eTrans2;
-  document.getElementById('e-hp').value = _esResult.eHP;
-  document.getElementById('e-tq').value = _esResult.eTQ;
-  document.getElementById('elec-en').checked = true;
-  let p = document.getElementById('elec-pill'); if(p){ p.textContent='ON'; p.className='pill pill-on'; }
-  calc();
-  showToast('Aplicado ao painel elétrico!', 'success');
+  if(applyElectricBuild(_esResult, false)) showToast('Aplicado ao painel elétrico!', 'success');
 });
 
 document.getElementById('es-apply-sw-btn').addEventListener('click', () => {
-  if(!_esResult){ showToast('Calcule primeiro!', 'error'); return; }
-  document.getElementById('sw-firstgear').value = _esResult.efg.toFixed(1);
-  document.getElementById('sw-hplimit').value = _esResult.hpLimit;
-  showToast('Aplicado ao EngineSwitch!', 'success');
+  if(applyElectricBuild(_esResult, true)) showToast('Aplicado ao EngineSwitch!', 'success');
 });
+
+let electricBuildApplyBtn = document.getElementById('e-build-apply-btn');
+if(electricBuildApplyBtn) {
+  electricBuildApplyBtn.addEventListener('click', () => {
+    let result = calculateElectricBuild(v('e-build-peakrpm'), v('e-build-vmax'), v('e-build-t100'), v('e-build-hplimit'));
+    renderElectricBuild('e-build-', result);
+    applyElectricBuild(result, false);
+    showToast('Elétrico gerado do zero e aplicado!', 'success');
+  });
+}
 
 /* Export Lua */
 function luaN(n){ return Number.isInteger(n) ? String(n) : String(Math.round(n*1000)/1000); }
