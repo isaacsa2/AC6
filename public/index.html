@@ -28,6 +28,7 @@
   <button class="nav-item" data-tab="steering" data-i18n="steering">Direção</button>
   <button class="nav-item" data-tab="electric" data-i18n="electric">Motor Elétrico</button>
   <button class="nav-item" data-tab="extras" data-i18n="extras">Extras & Misc</button>
+  <button class="nav-item" data-tab="articulated" data-i18n="articulated">Articulado</button>
   <button class="nav-item" data-tab="engswitch">EngineSwitch</button>
 
   <div class="sidebar-section" data-i18n="file">Arquivo</div>
@@ -549,6 +550,55 @@
       </div>
     </div>
 
+    <!-- ══ ARTICULADO ══ -->
+    <div class="tab-panel" data-panel="articulated">
+      <div class="page-head"><div><h1 data-i18n="articulatedTitle">ARTICULADO</h1><p data-i18n="articulatedSub">Overrides do módulo 2 · Body2/Wheels2/AJoint</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title" data-i18n="articulatedSync">Sincronização</p>
+          <div class="toggle-row">
+            <label class="toggle-label"><span class="switch"><input type="checkbox" id="art-enable" checked><span class="slider-sw"></span></span>Exportar campos do módulo 2</label>
+            <span class="pill pill-on" id="art-enable-pill">ON</span>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label"><span class="switch"><input type="checkbox" id="art-sync" checked><span class="slider-sw"></span></span>Sincronizar com o módulo principal</label>
+            <span class="pill pill-on" id="art-sync-pill">ON</span>
+          </div>
+          <p class="field-note" data-i18n="articulatedNote">O Drive do byisaacsa2 usa campos com sufixo 2 quando existem e volta para o valor principal quando não existem.</p>
+        </div>
+        <div class="card">
+          <p class="card-title" data-i18n="summary">Resumo</p>
+          <div class="sus-results" style="grid-template-columns:1fr 1fr;margin:0">
+            <div class="metric metric-green"><p class="lbl" data-i18n="body2Weight">Peso Body2</p><p class="val" id="art-weight-summary">—</p><p class="sub">Weight2</p></div>
+            <div class="metric metric-amber"><p class="lbl" data-i18n="module2Config">Config módulo 2</p><p class="val" id="art-config-summary">—</p><p class="sub">Config2</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title" data-i18n="weightTraction">Peso & Tração</p>
+          <div class="field-group">
+            <div class="field"><label>Weight2 (lbs)</label><input type="number" data-tune-art="Weight2" id="art-weight2" value="2600"></div>
+            <div class="field"><label>Config2</label><select data-tune-art="Config2" id="art-config2"><option value="RWD">RWD</option><option value="FWD">FWD</option><option value="AWD">AWD</option></select></div>
+            <div class="field"><label>BrakeForce2</label><input type="number" data-tune-art="BrakeForce2" id="art-brakeforce2" value="10400"></div>
+            <div class="field"><label>BrakeBias2</label><input type="number" data-tune-art="BrakeBias2" id="art-brakebias2" value="0.6" step="0.01"></div>
+            <div class="field"><label>PBrakeForce2</label><input type="number" data-tune-art="PBrakeForce2" id="art-pbrakeforce2" value="0"></div>
+            <div class="field"><label>PBrakeBias2</label><input type="number" data-tune-art="PBrakeBias2" id="art-pbrakebias2" value="0" step="0.01"></div>
+            <div class="field"><label>EBrakeForce2</label><input type="number" data-tune-art="EBrakeForce2" id="art-ebrakeforce2" value="800"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title" data-i18n="module2Steering">Direção do módulo 2</p>
+          <div class="field-group">
+            <div class="field"><label>SteerOuter2</label><input type="number" data-tune-art="SteerOuter2" id="art-steerouter2" value="60" step="0.1"></div>
+            <div class="field"><label>SteerInner2</label><input type="number" data-tune-art="SteerInner2" id="art-steerinner2" value="60" step="0.1"></div>
+            <div class="field"><label>RSteerOuter2</label><input type="number" data-tune-art="RSteerOuter2" id="art-rsteerouter2" value="10" step="0.1"></div>
+            <div class="field"><label>RSteerInner2</label><input type="number" data-tune-art="RSteerInner2" id="art-rsteerinner2" value="10" step="0.1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ ENGINE SWITCH ══ -->
     <div class="tab-panel" data-panel="engswitch">
       <div class="page-head"><div><h1>ENGINESWITCH</h1><p>Calculadora elétrica reversa · config do script</p></div></div>
@@ -653,7 +703,7 @@
         <p class="import-hint">Cole o conteúdo do Tune.lua (linhas "Tune.XXX = valor")</p>
         <textarea id="import-textarea" placeholder="-- Cole aqui&#10;Tune.Horsepower = 135&#10;Tune.FinalDrive = 10.47&#10;..."></textarea>
         <div class="import-drop-row">
-          <label class="btn btn-outline" style="cursor:pointer">Carregar arquivo .lua/.txt<input type="file" id="import-file-input" accept=".lua,.txt" style="display:none"></label>
+          <label class="btn btn-outline" style="cursor:pointer">Carregar arquivo .lua/.txt/.rbxmx<input type="file" id="import-file-input" accept=".lua,.txt,.rbxmx" style="display:none"></label>
           <span class="import-status" id="import-status" style="display:none"></span>
         </div>
       </div>

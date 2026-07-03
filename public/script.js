@@ -5,6 +5,19 @@ const CHASSIS_VARIANT = document.body?.dataset.chassisVariant || 'byisaacsa2';
 const IS_BYINSPARE = CHASSIS_VARIANT.toLowerCase() === 'byinspare';
 const STORAGE_KEY = IS_BYINSPARE ? 'ac6_byinspare_saved_tune' : 'ac6c_saved_tune';
 let chassisTemplateSource = '';
+const ARTICULATED_FIELD_MAP = {
+  Weight2: 'weight',
+  Config2: 'diffconfig',
+  BrakeForce2: 'bk-force',
+  BrakeBias2: 'bk-bias',
+  PBrakeForce2: 'bk-pforce',
+  PBrakeBias2: 'bk-pbias',
+  EBrakeForce2: 'bk-eforce',
+  SteerOuter2: 'st-outer',
+  SteerInner2: 'st-inner',
+  RSteerOuter2: 'rsteer-outer',
+  RSteerInner2: 'rsteer-inner'
+};
 
 function hideElement(el) {
   if(el) el.style.display = 'none';
@@ -59,6 +72,84 @@ function setupByInspareUi() {
 }
 
 setupByInspareUi();
+
+function syncArticulatedFields() {
+  if(IS_BYINSPARE || !document.getElementById('art-sync')?.checked) return;
+
+  Object.entries(ARTICULATED_FIELD_MAP).forEach(([targetKey, sourceId]) => {
+    let target = document.querySelector('[data-tune-art="' + targetKey + '"]');
+    let source = document.getElementById(sourceId);
+    if(!target || !source) return;
+    let rawValue = source.textContent && !source.value ? source.textContent : source.value;
+    if(targetKey === 'Weight2') {
+      let mainWeight = parseFloat(rawValue) || 0;
+      target.value = mainWeight ? Math.round(mainWeight * 0.5) : '';
+      return;
+    }
+    if((targetKey === 'SteerOuter2' || targetKey === 'SteerInner2') && Number.isNaN(parseFloat(rawValue))) {
+      rawValue = document.getElementById('steer-lock')?.value || target.value;
+    }
+    target.value = rawValue;
+  });
+
+  let weight2 = document.getElementById('art-weight2');
+  let config2 = document.getElementById('art-config2');
+  let weightSummary = document.getElementById('art-weight-summary');
+  let configSummary = document.getElementById('art-config-summary');
+  if(weightSummary && weight2) weightSummary.textContent = Math.round(parseFloat(weight2.value) || 0).toLocaleString() + ' lbs';
+  if(configSummary && config2) configSummary.textContent = config2.value || '—';
+}
+
+function updateArticulatedPills() {
+  ['art-enable', 'art-sync'].forEach(id => {
+    let el = document.getElementById(id);
+    let pill = document.getElementById(id + '-pill');
+    if(!el || !pill) return;
+    pill.textContent = el.checked ? 'ON' : 'OFF';
+    pill.className = 'pill ' + (el.checked ? 'pill-on' : 'pill-off');
+  });
+}
+
+function collectArticulatedValues() {
+  let values = {};
+  if(IS_BYINSPARE || !document.getElementById('art-enable')?.checked) return values;
+  syncArticulatedFields();
+  document.querySelectorAll('[data-tune-art]').forEach(el => {
+    let key = el.dataset.tuneArt;
+    if(!key) return;
+    values[key] = el.tagName === 'SELECT' ? el.value : (parseFloat(el.value) || 0);
+  });
+  return values;
+}
+
+function buildArticulatedBlock() {
+  let values = collectArticulatedValues();
+  let keys = Object.keys(values);
+  if(keys.length === 0) return '';
+  let lines = ['\n--[[Articulated Module 2]]'];
+  keys.forEach(key => lines.push('Tune.' + key + '\t\t= ' + tuneLineValue(values[key])));
+  return lines.join('\n') + '\n';
+}
+
+function setupArticulatedUi() {
+  if(IS_BYINSPARE) return;
+  ['art-enable', 'art-sync'].forEach(id => {
+    let el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('change', () => {
+      updateArticulatedPills();
+      syncArticulatedFields();
+    });
+  });
+  document.querySelectorAll('input[id], select[id]').forEach(el => {
+    el.addEventListener('input', syncArticulatedFields);
+    el.addEventListener('change', syncArticulatedFields);
+  });
+  updateArticulatedPills();
+  syncArticulatedFields();
+}
+
+setupArticulatedUi();
 
 function v(id){ let e = document.getElementById(id); return e ? (parseFloat(e.value)||0) : 0; }
 function s(id){ let e = document.getElementById(id); return e ? e.value : ''; }
@@ -556,7 +647,7 @@ function updateGearIndicator() {
 function calcCore(){
   calcHP(); calcPW(); calcClutch(); calcDiff(); calcSus(); 
   calcDrivetrain(); calcBrakes(); calcSteering(); calcElec();
-  updateBanner(); updateGearIndicator(); refreshUnitLabels();
+  updateBanner(); updateGearIndicator(); refreshUnitLabels(); syncArticulatedFields();
 }
 const calc = debounce(calcCore, 100);
 
@@ -745,7 +836,30 @@ function buildByInspareLua() {
 
 function buildLua() {
   if(IS_BYINSPARE) return buildByInspareLua();
-  return buildLuaIsaacsa2();
+  return buildByIsaacsa2Lua();
+}
+
+function injectArticulatedBlock(source) {
+  let block = buildArticulatedBlock();
+  if(!block) return source;
+  if(/--\[\[Articulated Module 2\]\][\s\S]*?\n(?=return Tune)/.test(source)) {
+    return source.replace(/--\[\[Articulated Module 2\]\][\s\S]*?\n(?=return Tune)/, block);
+  }
+  return source.replace(/\nreturn Tune\s*$/m, block + '\nreturn Tune');
+}
+
+function buildByIsaacsa2Lua() {
+  let source = chassisTemplateSource || '';
+  if(!source) return injectArticulatedBlock(buildLuaIsaacsa2());
+
+  let vals = collectTuneValues();
+  Object.keys(vals).forEach(key => {
+    if(key === 'Ratios') return;
+    source = replaceTuneLine(source, key, vals[key]);
+  });
+
+  source = source.replace(/Tune\.Ratios\s*=\s*\{[\s\S]*?\n\}/, buildRatiosBlock());
+  return injectArticulatedBlock(source);
 }
 
 function buildLuaIsaacsa2() {
@@ -867,7 +981,30 @@ const KM={'Horsepower':'hp','PeakRPM':'peakrpm','Redline':'redline','Compression
 const KB={'Engine':'engine-en','ABSEnabled':'abs-en','TCSEnabled':'tcs-en','Clutch':'clutch-en','Stall':'stall-en','ClutchKick':'ck-en','Electric':'elec-en','AutoFlip':'autoflip-en','AutoStart':'autostart-en','NeutralLimit':'neutrallimit-en','LimitClutch':'limitclutch-en'};
 const KS={'AutoShiftType':'autoshifttype','AutoShiftVers':'autoshiftvers','AutoShiftMode':'autoshiftmode','ClutchType':'clutchtype','ClutchMode':'clutchmode','DifferentialType':'difftype','Config':'diffconfig','SteeringType':'steeringtype','FWSteer':'fwsteer'};
 
+function decodeXmlEntities(text) {
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function extractTuneSource(text) {
+  if(!/<roblox[\s>]/i.test(text)) return text;
+  let protectedMatches = [...text.matchAll(/<ProtectedString name="Source"><!\[CDATA\[([\s\S]*?)\]\]><\/ProtectedString>/g)];
+  if(protectedMatches.length === 0) {
+    protectedMatches = [...text.matchAll(/<ProtectedString name="Source">([\s\S]*?)<\/ProtectedString>/g)];
+  }
+  for(let match of protectedMatches) {
+    let source = decodeXmlEntities(match[1] || '');
+    if(/local\s+Tune\s*=\s*\{\}/.test(source) && /return\s+Tune/.test(source)) return source;
+  }
+  return text;
+}
+
 function applyTuneTextToForm(txt) {
+  txt = extractTuneSource(txt);
   let applied = 0;
   
   let ratBlock = txt.match(/Tune\.Ratios\s*=\s*\{([\s\S]*?)\}/);
@@ -913,6 +1050,7 @@ function applyTuneTextToForm(txt) {
   });
   
   calc();
+  syncArticulatedFields();
   return applied;
 }
 
@@ -928,20 +1066,19 @@ document.getElementById('import-apply-btn').addEventListener('click', () => {
   }
 });
 
-if(IS_BYINSPARE) {
-  window.addEventListener('DOMContentLoaded', () => {
-    fetch('/chassis/AC6byInspareTUNE.luau')
-      .then(resp => resp.ok ? resp.text() : Promise.reject(new Error('HTTP ' + resp.status)))
-      .then(txt => {
-        chassisTemplateSource = txt;
-        applyTuneTextToForm(txt);
-        applyLanguage(false);
-      })
-      .catch(() => {
-        showToast(tr('templateError'), 'error');
-      });
-  });
-}
+window.addEventListener('DOMContentLoaded', () => {
+  let templatePath = IS_BYINSPARE ? '/chassis/AC6byInspareTUNE.luau' : '/chassis/AC6byisaacsa2TUNE.luau';
+  fetch(templatePath)
+    .then(resp => resp.ok ? resp.text() : Promise.reject(new Error('HTTP ' + resp.status)))
+    .then(txt => {
+      chassisTemplateSource = extractTuneSource(txt);
+      applyTuneTextToForm(chassisTemplateSource);
+      applyLanguage(false);
+    })
+    .catch(() => {
+      if(IS_BYINSPARE) showToast(tr('templateError'), 'error');
+    });
+});
 
 /* ─────────── LOCAL STORAGE & SHARE URL ─────────── */
 function getFormValues() {
@@ -1030,6 +1167,16 @@ const dict = {
     steering: 'Direção',
     electric: 'Motor Elétrico',
     extras: 'Extras & Misc',
+    articulated: 'Articulado',
+    articulatedTitle: 'ARTICULADO',
+    articulatedSub: 'Overrides do modulo 2 - Body2/Wheels2/AJoint',
+    articulatedSync: 'Sincronizacao',
+    articulatedNote: 'O Drive do byisaacsa2 usa campos com sufixo 2 quando existem e volta para o valor principal quando nao existem.',
+    summary: 'Resumo',
+    body2Weight: 'Peso Body2',
+    module2Config: 'Config modulo 2',
+    weightTraction: 'Peso & Tracao',
+    module2Steering: 'Direcao do modulo 2',
     engineSub: 'Curva de potência · torque no dyno',
     exportStatusIsaac: 'Gera o A-Chassis Tune pronto pro Roblox',
     exportStatusInspare: 'Gera só os campos que existem no AC6 byInspare',
@@ -1063,6 +1210,16 @@ const dict = {
     steering: 'Steering',
     electric: 'Electric Motor',
     extras: 'Extras & Misc',
+    articulated: 'Articulated',
+    articulatedTitle: 'ARTICULATED',
+    articulatedSub: 'Module 2 overrides - Body2/Wheels2/AJoint',
+    articulatedSync: 'Sync',
+    articulatedNote: 'The byisaacsa2 Drive uses fields with suffix 2 when they exist and falls back to the main value when they do not.',
+    summary: 'Summary',
+    body2Weight: 'Body2 Weight',
+    module2Config: 'Module 2 Config',
+    weightTraction: 'Weight & Traction',
+    module2Steering: 'Module 2 Steering',
     engineSub: 'Power curve · dyno torque',
     exportStatusIsaac: 'Generates the A-Chassis Tune ready for Roblox',
     exportStatusInspare: 'Generates only fields that exist in AC6 byInspare',
