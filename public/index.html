@@ -568,9 +568,12 @@
         </div>
         <div class="card">
           <p class="card-title" data-i18n="summary">Resumo</p>
-          <div class="sus-results" style="grid-template-columns:1fr 1fr;margin:0">
+          <div class="sus-results" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin:0">
             <div class="metric metric-green"><p class="lbl" data-i18n="body2Weight">Peso Body2</p><p class="val" id="art-weight-summary">—</p><p class="sub">Weight2</p></div>
             <div class="metric metric-amber"><p class="lbl" data-i18n="module2Config">Config módulo 2</p><p class="val" id="art-config-summary">—</p><p class="sub">Config2</p></div>
+            <div class="metric metric-blue"><p class="lbl" data-i18n="sharedHp">HP compartilhado</p><p class="val" id="art-hp-summary">—</p><p class="sub">Horsepower</p></div>
+            <div class="metric metric-purple"><p class="lbl" data-i18n="sharedTorque">Torque compartilhado</p><p class="val" id="art-torque-summary">—</p><p class="sub">lbf.ft</p></div>
+            <div class="metric"><p class="lbl" data-i18n="sharedSpeed">Vel. compartilhada</p><p class="val" id="art-speed-summary">—</p><p class="sub" id="art-speed-sub">km/h</p></div>
           </div>
         </div>
       </div>

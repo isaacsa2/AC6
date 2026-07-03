@@ -74,7 +74,21 @@ function setupByInspareUi() {
 setupByInspareUi();
 
 function syncArticulatedFields() {
-  if(IS_BYINSPARE || !document.getElementById('art-sync')?.checked) return;
+  if(IS_BYINSPARE) return;
+  let artHp = document.getElementById('art-hp-summary');
+  let artTorque = document.getElementById('art-torque-summary');
+  let artSpeed = document.getElementById('art-speed-summary');
+  let artSpeedSub = document.getElementById('art-speed-sub');
+  if(artHp) artHp.textContent = document.getElementById('r-total')?.textContent || '—';
+  if(artTorque) {
+    let torqueSamples = window._hpChart?.data?.datasets?.[1]?.data || [];
+    let peakTorque = torqueSamples.reduce((max, value) => Math.max(max, parseFloat(value) || 0), 0);
+    artTorque.textContent = peakTorque ? Math.round(peakTorque).toLocaleString() : '—';
+  }
+  if(artSpeed) artSpeed.textContent = document.getElementById('dt-top-spd')?.textContent || '—';
+  if(artSpeedSub) artSpeedSub.textContent = spdLabel();
+
+  if(!document.getElementById('art-sync')?.checked) return;
 
   Object.entries(ARTICULATED_FIELD_MAP).forEach(([targetKey, sourceId]) => {
     let target = document.querySelector('[data-tune-art="' + targetKey + '"]');
@@ -1175,6 +1189,9 @@ const dict = {
     summary: 'Resumo',
     body2Weight: 'Peso Body2',
     module2Config: 'Config modulo 2',
+    sharedHp: 'HP compartilhado',
+    sharedTorque: 'Torque compartilhado',
+    sharedSpeed: 'Vel. compartilhada',
     weightTraction: 'Peso & Tracao',
     module2Steering: 'Direcao do modulo 2',
     engineSub: 'Curva de potência · torque no dyno',
@@ -1218,6 +1235,9 @@ const dict = {
     summary: 'Summary',
     body2Weight: 'Body2 Weight',
     module2Config: 'Module 2 Config',
+    sharedHp: 'Shared HP',
+    sharedTorque: 'Shared Torque',
+    sharedSpeed: 'Shared Speed',
     weightTraction: 'Weight & Traction',
     module2Steering: 'Module 2 Steering',
     engineSub: 'Power curve · dyno torque',
