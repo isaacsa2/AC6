@@ -690,25 +690,11 @@ function buildSuspensionPreset(profile) {
   let rearHz = Math.max(profile.rearHz, frontHz + .04);
   let kF = Math.round(Math.pow(frontHz * 2 * Math.PI, 2) * wF * AC6_SUS_STIFFNESS_SCALE);
   let kR = Math.round(Math.pow(rearHz * 2 * Math.PI, 2) * wR * AC6_SUS_STIFFNESS_SCALE);
-  let sagF = wF / Math.max(1, kF);
-  let sagR = wR / Math.max(1, kR);
-  let fComp = Math.round(Math.max(.08, sagF * profile.headroom) * 100) / 100;
-  let rComp = Math.round(Math.max(.08, sagR * profile.headroom) * 100) / 100;
-  let fExt = Math.round(Math.max(.25, profile.rideF * .75) * 100) / 100;
-  let rExt = Math.round(Math.max(.25, profile.rideR * .75) * 100) / 100;
   return {
     fstiff:kF,
     rstiff:kR,
     fdamp:Math.round(kF * profile.damp),
-    rdamp:Math.round(kR * profile.damp),
-    flen:profile.len,
-    rlen:profile.len,
-    fprecomp:Math.round((profile.rideF + sagF) * 100) / 100,
-    rprecomp:Math.round((profile.rideR + sagR) * 100) / 100,
-    fcomp:fComp,
-    rcomp:rComp,
-    fext:fExt,
-    rext:rExt
+    rdamp:Math.round(kR * profile.damp)
   };
 }
 document.querySelectorAll('.sus-preset').forEach(btn => {
