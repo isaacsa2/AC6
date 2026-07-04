@@ -4,7 +4,7 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const origin = url.origin;
+    const origin = "https://ac6.isaacsa2.online";
 
     if (url.pathname === "/sitemap.xml") {
       const lastmod = "2026-07-04";
