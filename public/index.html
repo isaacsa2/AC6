@@ -526,6 +526,7 @@
           <div class="field"><label>Vel. máx alvo (<span class="spd-unit">km/h</span>)</label><input type="number" id="e-build-vmax" value="120"></div>
           <div class="field"><label>0–100 <span class="spd-unit">km/h</span> alvo (s)</label><input type="number" id="e-build-t100" value="6" step="0.1"></div>
           <div class="field"><label>HP máximo</label><input type="number" id="e-build-hplimit" value="300"></div>
+          <div class="field"><label>Marchas</label><select id="e-build-gears"><option value="3">3 lineares</option><option value="2">2 longas</option><option value="4">4 curtas</option><option value="1">1 fixa/CVT</option></select></div>
         </div>
         <div class="sus-results" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin:.85rem 0">
           <div class="metric metric-blue"><p class="lbl">E_Redline</p><p class="val" id="e-build-redline-out">—</p><p class="sub">velocidade alvo</p></div>
@@ -533,6 +534,7 @@
           <div class="metric metric-blue"><p class="lbl">E_Trans2</p><p class="val" id="e-build-trans2-out">—</p><p class="sub">PeakRPM elétrico</p></div>
           <div class="metric metric-green"><p class="lbl">E_Horsepower</p><p class="val" id="e-build-hp-out">—</p><p class="sub">alvo 0–100</p></div>
           <div class="metric metric-green"><p class="lbl">E_Torque</p><p class="val" id="e-build-tq-out">—</p><p class="sub">casado com Trans1</p></div>
+          <div class="metric metric-amber"><p class="lbl">Ratios</p><p class="val" id="e-build-ratios-out">—</p><p class="sub">lineares</p></div>
         </div>
         <button class="btn btn-amber" id="e-build-apply-btn" type="button">Gerar e aplicar elétrico</button>
       </div>
@@ -638,6 +640,7 @@
           <div class="field"><label>Vel. máx elétrica (<span class="spd-unit">km/h</span>)</label><input type="number" id="es-vmax" value="120"></div>
           <div class="field"><label>0–100 <span class="spd-unit">km/h</span> alvo (s)</label><input type="number" id="es-t100" value="6" step="0.1"></div>
           <div class="field"><label>ELECTRIC_HP_LIMIT</label><input type="number" id="es-hplimit" value="300"></div>
+          <div class="field"><label>Marchas elétricas</label><select id="es-gears"><option value="3">3 lineares</option><option value="2">2 longas</option><option value="4">4 curtas</option><option value="1">1 fixa/CVT</option></select></div>
         </div>
         <button class="btn btn-amber" id="es-calc-btn">⚡ Calcular parâmetros elétricos</button>
       </div>
@@ -649,6 +652,7 @@
         <div class="metric metric-green"><p class="lbl">E_Horsepower</p><p class="val" id="es-hp" style="color:var(--green)">—</p><p class="sub">HP necessário</p></div>
         <div class="metric metric-green"><p class="lbl">E_Torque</p><p class="val" id="es-tq" style="color:var(--green)">—</p><p class="sub">TQ estimado</p></div>
         <div class="metric metric-amber"><p class="lbl">ELECTRIC_FIRST_GEAR</p><p class="val" id="es-firstgear" style="color:var(--amber)">—</p><p class="sub">ratio da 1ª elétrica</p></div>
+        <div class="metric metric-amber"><p class="lbl">Ratios</p><p class="val" id="es-ratios" style="color:var(--amber)">—</p><p class="sub">lineares</p></div>
       </div>
 
       <div style="display:flex;gap:.65rem;margin-bottom:.85rem;flex-wrap:wrap">

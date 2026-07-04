@@ -202,6 +202,23 @@ function finalDriveForSpeedMph(speedMph, redline, ratio, fdMult, wheelDiameter) 
   return redline / Math.max(0.001, wheelRpm * ratio * fdMult);
 }
 
+function generateElectricRatios(eRedline, vmaxMph, gearCount, finalDrive, wheelDiameter) {
+  let count = Math.max(1, Math.min(4, parseInt(gearCount, 10) || 3));
+  let wheelRpm = vmaxMph / Math.max(0.001, SPD_SCALE * (wheelDiameter / 2)) * 60 / (2 * Math.PI);
+  let last = eRedline / Math.max(0.001, wheelRpm * finalDrive);
+  last = Math.max(0.45, Math.min(1.4, last));
+  if(count === 1) return [Math.round(last * 100) / 100];
+
+  let spread = { 2: 1.75, 3: 2.35, 4: 2.85 }[count] || 2.35;
+  let first = Math.max(last + 0.35, Math.min(last * spread, 3.8));
+  let ratios = [];
+  for(let i = 0; i < count; i++) {
+    let t = count === 1 ? 0 : i / (count - 1);
+    ratios.push(Math.round((first + ((last - first) * t)) * 100) / 100);
+  }
+  return ratios;
+}
+
 function refreshUnitLabels(){
   document.querySelectorAll('.spd-unit').forEach(el => el.textContent = spdLabel());
 }
@@ -791,7 +808,7 @@ document.getElementById('rh-calc-btn').addEventListener('click', () => {
 
 /* EngineSwitch Calc */
 let _esResult = null;
-function calculateElectricBuild(peakRpm, vmaxSpd, t100, hpLimit) {
+function calculateElectricBuild(peakRpm, vmaxSpd, t100, hpLimit, gearCount) {
   let gear = getGearSetup();
   let fFD = gear.fd * gear.fdMult;
   let vmaxMph = USE_KMH ? vmaxSpd / 1.60934 : vmaxSpd;
@@ -807,16 +824,16 @@ function calculateElectricBuild(peakRpm, vmaxSpd, t100, hpLimit) {
   eHP = Math.max(1, Math.min(eHP, hpLimit || eHP));
   let eTQ = Math.round((eHP * 5252) / Math.max(500, eTrans1));
 
-  let wheelRPMLow = (5 / SPD_SCALE) / ((gear.wheelDiameter / 2) * 2 * Math.PI / 60);
-  let efg = Math.round((eRedline / Math.max(0.001, wheelRPMLow * fFD)) * 10) / 10;
+  let ratios = generateElectricRatios(eRedline, vmaxMph, gearCount, fFD, gear.wheelDiameter);
+  let efg = ratios[0] || 1;
   return {
-    eRedline, eTrans1, eTrans2, eHP, eTQ, efg,
+    eRedline, eTrans1, eTrans2, eHP, eTQ, efg, ratios,
     hpLimit: hpLimit || eHP,
-    hFrontMult: 0.18,
-    hEndMult: 2.2,
-    hEndPercent: 12,
-    tEndMult: 1.8,
-    tEndPercent: 35
+    hFrontMult: 0.12,
+    hEndMult: 1.85,
+    hEndPercent: 8,
+    tEndMult: 1.35,
+    tEndPercent: 22
   };
 }
 
@@ -832,6 +849,7 @@ function renderElectricBuild(prefix, result) {
   set('hp', result.eHP);
   set('tq', result.eTQ);
   set('firstgear', result.efg.toFixed(1));
+  set('ratios', result.ratios.map(r => r.toFixed(2)).join(', '));
 }
 
 function applyElectricBuild(result, applySwitch = false) {
@@ -846,8 +864,22 @@ function applyElectricBuild(result, applySwitch = false) {
   document.getElementById('e-hendpct').value = result.hEndPercent;
   document.getElementById('e-tqendmult').value = result.tEndMult;
   document.getElementById('e-tqendpct').value = result.tEndPercent;
+  document.getElementById('dt-ratio-r').value = result.ratios[0].toFixed(2);
+  document.getElementById('dt-ratios').value = result.ratios.map(r => r.toFixed(2)).join(', ');
+  document.getElementById('clutchtype').value = 'CVT';
+  document.getElementById('clutch-en').checked = true;
+  document.getElementById('stall-en').checked = false;
+  document.getElementById('autoshiftmode').value = 'RPM';
+  document.getElementById('autoshifttype').value = 'Rev';
+  document.getElementById('shiftuptime').value = '0.05';
+  document.getElementById('shiftdntime').value = '0.08';
+  document.getElementById('rpmengage').value = Math.round(result.eTrans1 * 0.85);
+  document.getElementById('speedengage').value = 8;
   document.getElementById('elec-en').checked = true;
+  document.getElementById('engine-en').checked = false;
   let p = document.getElementById('elec-pill'); if(p){ p.textContent='ON'; p.className='pill pill-on'; }
+  let enginePill = document.getElementById('engine-pill'); if(enginePill){ enginePill.textContent='OFF'; enginePill.className='pill pill-off'; }
+  let clutchPill = document.getElementById('clutch-pill'); if(clutchPill){ clutchPill.textContent='ON'; clutchPill.className='pill pill-on'; }
   if(applySwitch) {
     document.getElementById('sw-firstgear').value = result.efg.toFixed(1);
     document.getElementById('sw-hplimit').value = result.hpLimit;
@@ -857,7 +889,7 @@ function applyElectricBuild(result, applySwitch = false) {
 }
 
 document.getElementById('es-calc-btn').addEventListener('click', () => {
-  _esResult = calculateElectricBuild(v('es-peakrpm'), v('es-vmax'), v('es-t100'), v('es-hplimit'));
+  _esResult = calculateElectricBuild(v('es-peakrpm'), v('es-vmax'), v('es-t100'), v('es-hplimit'), v('es-gears'));
   renderElectricBuild('es-', _esResult);
   showToast('Parâmetros elétricos calculados!', 'success');
 });
@@ -873,7 +905,7 @@ document.getElementById('es-apply-sw-btn').addEventListener('click', () => {
 let electricBuildApplyBtn = document.getElementById('e-build-apply-btn');
 if(electricBuildApplyBtn) {
   electricBuildApplyBtn.addEventListener('click', () => {
-    let result = calculateElectricBuild(v('e-build-peakrpm'), v('e-build-vmax'), v('e-build-t100'), v('e-build-hplimit'));
+    let result = calculateElectricBuild(v('e-build-peakrpm'), v('e-build-vmax'), v('e-build-t100'), v('e-build-hplimit'), v('e-build-gears'));
     renderElectricBuild('e-build-', result);
     applyElectricBuild(result, false);
     showToast('Elétrico gerado do zero e aplicado!', 'success');
@@ -1047,7 +1079,7 @@ document.getElementById('sw-export-btn').addEventListener('click', () => {
   let hpLimit = v('sw-hplimit');
   let printStates = document.getElementById('sw-print').checked;
 
-  let lua = `-- EngineSwitch — gerado pelo AC6C Tune Maker\nlocal UserInputService = game:GetService("UserInputService")\nlocal tuneModule = require(script.Parent.Car.Value["A-Chassis Tune"]) :: ModuleScript\nlocal driveScript = script.Parent.Drive :: LocalScript\nlocal valuesFolder = script.Parent.Values :: Folder\n\nlocal PRINT_STATES = ${printStates}\nlocal TOGGLE_KEY = Enum.KeyCode.${key}\nlocal CHANGE_AT_SPEED = ${changeAtSpd}\nlocal ELECTRIC_FIRST_GEAR = ${firstGear}\nlocal ELECTRIC_HP_LIMIT = ${hpLimit}\n\nlocal cachedTune = {}\nlocal changed = false\nfor key, value in tuneModule do\n\tcachedTune[key] = value\nend\n\nlocal function toggleEngineState(electric: boolean)\n\tif PRINT_STATES then print(electric and "Electric" or "Combustion") end\n\ttuneModule.Electric = electric\n\ttuneModule.Engine = not electric\n\ttuneModule.Redline = electric and cachedTune.E_Redline or cachedTune.Redline\n\ttuneModule.ShiftRPM = electric and cachedTune.E_Redline or cachedTune.ShiftRPM\n\ttuneModule.Turbochargers = electric and 0 or cachedTune.Turbochargers\n\ttuneModule.Superchargers = electric and 0 or cachedTune.Superchargers\n\ttuneModule.Clutch = not electric and cachedTune.Clutch or false\n\ttuneModule.IdleRPM = electric and 0 or cachedTune.IdleRPM\n\ttuneModule.IdleThrottle = electric and 0 or cachedTune.IdleThrottle\n\ttuneModule.ClutchType = electric and "Clutch" or cachedTune.ClutchType\n\ttuneModule.AutoShiftType = electric and "DCT" or cachedTune.AutoShiftType\n\ttuneModule.Ratios[3] = electric and ELECTRIC_FIRST_GEAR or cachedTune.Ratios[3]\n\ttuneModule.HPLimit = electric and ELECTRIC_HP_LIMIT or cachedTune.HPLimit\nend\n\n`;
+  let lua = `-- EngineSwitch — gerado pelo AC6C Tune Maker\nlocal UserInputService = game:GetService("UserInputService")\nlocal tuneModule = require(script.Parent.Car.Value["A-Chassis Tune"]) :: ModuleScript\nlocal driveScript = script.Parent.Drive :: LocalScript\nlocal valuesFolder = script.Parent.Values :: Folder\n\nlocal PRINT_STATES = ${printStates}\nlocal TOGGLE_KEY = Enum.KeyCode.${key}\nlocal CHANGE_AT_SPEED = ${changeAtSpd}\nlocal ELECTRIC_FIRST_GEAR = ${firstGear}\nlocal ELECTRIC_HP_LIMIT = ${hpLimit}\n\nlocal cachedTune = {}\nlocal changed = false\nfor key, value in tuneModule do\n\tcachedTune[key] = value\nend\n\nlocal function toggleEngineState(electric: boolean)\n\tif PRINT_STATES then print(electric and "Electric" or "Combustion") end\n\ttuneModule.Electric = electric\n\ttuneModule.Engine = not electric\n\ttuneModule.Redline = electric and cachedTune.E_Redline or cachedTune.Redline\n\ttuneModule.ShiftRPM = electric and cachedTune.E_Redline or cachedTune.ShiftRPM\n\ttuneModule.Turbochargers = electric and 0 or cachedTune.Turbochargers\n\ttuneModule.Superchargers = electric and 0 or cachedTune.Superchargers\n\ttuneModule.Clutch = electric and true or cachedTune.Clutch\n\ttuneModule.IdleRPM = electric and 0 or cachedTune.IdleRPM\n\ttuneModule.IdleThrottle = electric and 0 or cachedTune.IdleThrottle\n\ttuneModule.ClutchType = electric and "CVT" or cachedTune.ClutchType\n\ttuneModule.AutoShiftType = electric and "Rev" or cachedTune.AutoShiftType\n\ttuneModule.AutoShiftMode = electric and "RPM" or cachedTune.AutoShiftMode\n\ttuneModule.ShiftUpTime = electric and 0.05 or cachedTune.ShiftUpTime\n\ttuneModule.ShiftDnTime = electric and 0.08 or cachedTune.ShiftDnTime\n\ttuneModule.Ratios[3] = electric and ELECTRIC_FIRST_GEAR or cachedTune.Ratios[3]\n\ttuneModule.HPLimit = electric and ELECTRIC_HP_LIMIT or cachedTune.HPLimit\nend\n\n`;
   if(changeAtSpd > 0){
     lua += `local function onVelocityChanged(value: Vector3)\n\tif value.Magnitude < 5 then changed = false end\n\tif changed then return end\n\n\tif value.Magnitude >= CHANGE_AT_SPEED and tuneModule.Electric then\n\t\ttoggleEngineState(false)\n\t\tchanged = true\n\telseif value.Magnitude < CHANGE_AT_SPEED and not tuneModule.Electric then\n\t\ttoggleEngineState(true)\n\tend\nend\n\nvaluesFolder.Velocity.Changed:Connect(onVelocityChanged)\n`;
   } else {
