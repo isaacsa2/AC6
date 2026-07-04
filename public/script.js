@@ -848,6 +848,59 @@ function tuneLineValue(value) {
   return luaN(value);
 }
 
+function sanitizeControlValue(value) {
+  let raw = String(value || '').trim();
+  if(/^Enum\.(KeyCode|UserInputType)\.[A-Za-z0-9_]+$/.test(raw)) return raw;
+  if(/^[A-Za-z0-9_]+$/.test(raw)) return 'Enum.KeyCode.' + raw;
+  return 'Enum.KeyCode.Unknown';
+}
+
+function collectControlValues() {
+  let controls = {};
+  document.querySelectorAll('[data-control]').forEach(el => {
+    controls[el.dataset.control] = sanitizeControlValue(el.value);
+  });
+  return controls;
+}
+
+function buildControlsBlock() {
+  let c = collectControlValues();
+  let groups = [
+    ['ToggleTCS','ToggleABS','ToggleTransMode','ToggleMouseDrive'],
+    ['Throttle','Brake','SteerLeft','SteerRight'],
+    ['Throttle2','Brake2','SteerLeft2','SteerRight2'],
+    ['ShiftUp','ShiftDown','Clutch','PBrake'],
+    ['MouseThrottle','MouseBrake','MouseClutch','MouseShiftUp','MouseShiftDown','MousePBrake'],
+    ['ContlrThrottle','ContlrBrake','ContlrSteer','ContlrShiftUp','ContlrShiftDown','ContlrClutch','ContlrPBrake','ContlrToggleTMode','ContlrToggleTCS','ContlrToggleABS']
+  ];
+  let lines = ['Tune.Controls = {'];
+  groups.forEach((group, index) => {
+    if(index > 0) lines.push('');
+    group.forEach(key => lines.push('\t' + key + '\t\t\t= ' + (c[key] || 'Enum.KeyCode.Unknown') + '\t\t\t\t,'));
+  });
+  lines.push('}');
+  return lines.join('\n');
+}
+
+function replaceControlsBlock(source) {
+  return source.replace(/Tune\.Controls\s*=\s*\{[\s\S]*?\n\}/, buildControlsBlock());
+}
+
+function applyControlsTextToForm(txt) {
+  let block = txt.match(/Tune\.Controls\s*=\s*\{([\s\S]*?)\}/);
+  if(!block) return 0;
+  let applied = 0;
+  block[1].split('\n').forEach(line => {
+    let m = line.match(/^\s*(\w+)\s*=\s*(Enum\.(?:KeyCode|UserInputType)\.[A-Za-z0-9_]+)/);
+    if(!m) return;
+    let el = document.querySelector('[data-control="' + m[1] + '"]');
+    if(!el) return;
+    el.value = m[2];
+    applied++;
+  });
+  return applied;
+}
+
 function collectTuneValues() {
   let vals = {};
   document.querySelectorAll('[data-tune]').forEach(el => {
@@ -912,6 +965,7 @@ function buildByIsaacsa2Lua() {
   });
 
   source = source.replace(/Tune\.Ratios\s*=\s*\{[\s\S]*?\n\}/, buildRatiosBlock());
+  source = replaceControlsBlock(source);
   return source;
 }
 
@@ -968,7 +1022,7 @@ function buildLuaIsaacsa2() {
   t+='--[[Brakes]]\n'+L('ABSEnabled')+L('ABSThreshold')+'\n'+L('BrakeForce')+L('BrakeBias')+L('PBrakeForce')+L('PBrakeBias')+L('EBrakeForce')+'\n';
   
   t+='--[[Default Controls]]\nTune.Peripherals = {\n\tMSteerWidth\t\t\t\t= 67,\n\tMSteerDZone\t\t\t\t= 10,\n\tControlLDZone\t\t\t= 5,\n\tControlRDZone\t\t\t= 5,\n}\n\nTune.Controls = {\n\tToggleTCS\t\t\t\t= Enum.KeyCode.T,\n\tToggleABS\t\t\t\t= Enum.KeyCode.Y,\n\tToggleTransMode\t\t\t= Enum.KeyCode.LeftAlt,\n\tToggleMouseDrive\t\t= Enum.KeyCode.Insert,\n\tThrottle\t\t\t\t= Enum.KeyCode.Up,\n\tBrake\t\t\t\t\t= Enum.KeyCode.Down,\n\tSteerLeft\t\t\t\t= Enum.KeyCode.Left,\n\tSteerRight\t\t\t\t= Enum.KeyCode.Right,\n\tThrottle2\t\t\t\t= Enum.KeyCode.W,\n\tBrake2\t\t\t\t\t= Enum.KeyCode.S,\n\tSteerLeft2\t\t\t\t= Enum.KeyCode.A,\n\tSteerRight2\t\t\t\t= Enum.KeyCode.D,\n\tShiftUp\t\t\t\t\t= Enum.KeyCode.E,\n\tShiftDown\t\t\t\t= Enum.KeyCode.Q,\n\tClutch\t\t\t\t\t= Enum.KeyCode.LeftShift,\n\tPBrake\t\t\t\t\t= Enum.KeyCode.Asterisk,\n\tMouseThrottle\t\t\t= Enum.UserInputType.MouseButton1,\n\tMouseBrake\t\t\t\t= Enum.UserInputType.MouseButton2,\n\tMouseClutch\t\t\t\t= Enum.KeyCode.W,\n\tMouseShiftUp\t\t\t= Enum.KeyCode.E,\n\tMouseShiftDown\t\t\t= Enum.KeyCode.Q,\n\tMousePBrake\t\t\t\t= Enum.KeyCode.LeftShift,\n\tContlrThrottle\t\t\t= Enum.KeyCode.ButtonR2,\n\tContlrBrake\t\t\t\t= Enum.KeyCode.ButtonL2,\n\tContlrSteer\t\t\t\t= Enum.KeyCode.Thumbstick1,\n\tContlrShiftUp\t\t\t= Enum.KeyCode.ButtonY,\n\tContlrShiftDown\t\t\t= Enum.KeyCode.ButtonX,\n\tContlrClutch\t\t\t= Enum.KeyCode.ButtonR1,\n\tContlrPBrake\t\t\t= Enum.KeyCode.ButtonL1,\n\tContlrToggleTMode\t\t= Enum.KeyCode.DPadUp,\n\tContlrToggleTCS\t\t\t= Enum.KeyCode.DPadDown,\n\tContlrToggleABS\t\t\t= Enum.KeyCode.DPadRight,\n}\n\nreturn Tune\n';
-  return t;
+  return replaceControlsBlock(t);
 }
 
 const expBack = document.getElementById('export-modal-backdrop');
@@ -1059,6 +1113,7 @@ function extractTuneSource(text) {
 function applyTuneTextToForm(txt) {
   txt = extractTuneSource(txt);
   let applied = 0;
+  applied += applyControlsTextToForm(txt);
   
   let ratBlock = txt.match(/Tune\.Ratios\s*=\s*\{([\s\S]*?)\}/);
   if(ratBlock){
@@ -1219,6 +1274,14 @@ const dict = {
     steering: 'Direção',
     electric: 'Motor Elétrico',
     extras: 'Extras & Misc',
+    controls: 'Controles',
+    controlsTitle: 'CONTROLES',
+    controlsSub: 'Teclado - mouse - gamepad',
+    controlsKeyboardPrimary: 'Teclado principal',
+    controlsKeyboardSecondary: 'Teclado secundario',
+    controlsTransmission: 'Transmissao & assistencias',
+    controlsMouse: 'Mouse',
+    controlsGamepad: 'Gamepad',
     weightTraction: 'Peso & Tracao',
     engineSub: 'Curva de potência · torque no dyno',
     exportStatusIsaac: 'Gera o A-Chassis Tune pronto pro Roblox',
@@ -1253,6 +1316,14 @@ const dict = {
     steering: 'Steering',
     electric: 'Electric Motor',
     extras: 'Extras & Misc',
+    controls: 'Controls',
+    controlsTitle: 'CONTROLS',
+    controlsSub: 'Keyboard - mouse - gamepad',
+    controlsKeyboardPrimary: 'Primary keyboard',
+    controlsKeyboardSecondary: 'Secondary keyboard',
+    controlsTransmission: 'Transmission & assists',
+    controlsMouse: 'Mouse',
+    controlsGamepad: 'Gamepad',
     weightTraction: 'Weight & Traction',
     engineSub: 'Power curve · dyno torque',
     exportStatusIsaac: 'Generates the A-Chassis Tune ready for Roblox',

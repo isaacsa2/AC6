@@ -40,6 +40,7 @@
   <button class="nav-item" data-tab="steering" data-i18n="steering">Direção</button>
   <button class="nav-item" data-tab="electric" data-i18n="electric">Motor Elétrico</button>
   <button class="nav-item" data-tab="extras" data-i18n="extras">Extras & Misc</button>
+  <button class="nav-item" data-tab="controls" data-i18n="controls">Controles</button>
   <button class="nav-item" data-tab="engswitch">EngineSwitch</button>
 
   <div class="sidebar-section" data-i18n="file">Arquivo</div>
@@ -585,6 +586,72 @@
             <div class="field"><label>FToe</label><input type="number" data-tune="FToe" id="ftoe" value="0" step="0.1"></div>
             <div class="field"><label>RToe</label><input type="number" data-tune="RToe" id="rtoe" value="0" step="0.1"></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CONTROLES ══ -->
+    <div class="tab-panel" data-panel="controls">
+      <div class="page-head"><div><h1 data-i18n="controlsTitle">CONTROLES</h1><p data-i18n="controlsSub">Teclado · mouse · gamepad</p></div></div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title" data-i18n="controlsKeyboardPrimary">Teclado principal</p>
+          <div class="field-group">
+            <div class="field"><label>Throttle</label><input type="text" data-control="Throttle" value="Enum.KeyCode.Up"></div>
+            <div class="field"><label>Brake</label><input type="text" data-control="Brake" value="Enum.KeyCode.Down"></div>
+            <div class="field"><label>SteerLeft</label><input type="text" data-control="SteerLeft" value="Enum.KeyCode.Left"></div>
+            <div class="field"><label>SteerRight</label><input type="text" data-control="SteerRight" value="Enum.KeyCode.Right"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title" data-i18n="controlsKeyboardSecondary">Teclado secundário</p>
+          <div class="field-group">
+            <div class="field"><label>Throttle2</label><input type="text" data-control="Throttle2" value="Enum.KeyCode.W"></div>
+            <div class="field"><label>Brake2</label><input type="text" data-control="Brake2" value="Enum.KeyCode.S"></div>
+            <div class="field"><label>SteerLeft2</label><input type="text" data-control="SteerLeft2" value="Enum.KeyCode.A"></div>
+            <div class="field"><label>SteerRight2</label><input type="text" data-control="SteerRight2" value="Enum.KeyCode.D"></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid2" style="margin-bottom:.75rem;">
+        <div class="card">
+          <p class="card-title" data-i18n="controlsTransmission">Transmissão & assistências</p>
+          <div class="field-group">
+            <div class="field"><label>ShiftUp</label><input type="text" data-control="ShiftUp" value="Enum.KeyCode.E"></div>
+            <div class="field"><label>ShiftDown</label><input type="text" data-control="ShiftDown" value="Enum.KeyCode.Q"></div>
+            <div class="field"><label>Clutch</label><input type="text" data-control="Clutch" value="Enum.KeyCode.LeftShift"></div>
+            <div class="field"><label>PBrake</label><input type="text" data-control="PBrake" value="Enum.KeyCode.Asterisk"></div>
+            <div class="field"><label>ToggleTCS</label><input type="text" data-control="ToggleTCS" value="Enum.KeyCode.T"></div>
+            <div class="field"><label>ToggleABS</label><input type="text" data-control="ToggleABS" value="Enum.KeyCode.Y"></div>
+            <div class="field"><label>ToggleTransMode</label><input type="text" data-control="ToggleTransMode" value="Enum.KeyCode.LeftAlt"></div>
+            <div class="field"><label>ToggleMouseDrive</label><input type="text" data-control="ToggleMouseDrive" value="Enum.KeyCode.Insert"></div>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title" data-i18n="controlsMouse">Mouse</p>
+          <div class="field-group">
+            <div class="field"><label>MouseThrottle</label><input type="text" data-control="MouseThrottle" value="Enum.UserInputType.MouseButton1"></div>
+            <div class="field"><label>MouseBrake</label><input type="text" data-control="MouseBrake" value="Enum.UserInputType.MouseButton2"></div>
+            <div class="field"><label>MouseClutch</label><input type="text" data-control="MouseClutch" value="Enum.KeyCode.W"></div>
+            <div class="field"><label>MouseShiftUp</label><input type="text" data-control="MouseShiftUp" value="Enum.KeyCode.E"></div>
+            <div class="field"><label>MouseShiftDown</label><input type="text" data-control="MouseShiftDown" value="Enum.KeyCode.Q"></div>
+            <div class="field"><label>MousePBrake</label><input type="text" data-control="MousePBrake" value="Enum.KeyCode.LeftShift"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <p class="card-title" data-i18n="controlsGamepad">Gamepad</p>
+        <div class="field-group">
+          <div class="field"><label>ContlrThrottle</label><input type="text" data-control="ContlrThrottle" value="Enum.KeyCode.ButtonR2"></div>
+          <div class="field"><label>ContlrBrake</label><input type="text" data-control="ContlrBrake" value="Enum.KeyCode.ButtonL2"></div>
+          <div class="field"><label>ContlrSteer</label><input type="text" data-control="ContlrSteer" value="Enum.KeyCode.Thumbstick1"></div>
+          <div class="field"><label>ContlrShiftUp</label><input type="text" data-control="ContlrShiftUp" value="Enum.KeyCode.ButtonY"></div>
+          <div class="field"><label>ContlrShiftDown</label><input type="text" data-control="ContlrShiftDown" value="Enum.KeyCode.ButtonX"></div>
+          <div class="field"><label>ContlrClutch</label><input type="text" data-control="ContlrClutch" value="Enum.KeyCode.ButtonR1"></div>
+          <div class="field"><label>ContlrPBrake</label><input type="text" data-control="ContlrPBrake" value="Enum.KeyCode.ButtonL1"></div>
+          <div class="field"><label>ContlrToggleTMode</label><input type="text" data-control="ContlrToggleTMode" value="Enum.KeyCode.DPadUp"></div>
+          <div class="field"><label>ContlrToggleTCS</label><input type="text" data-control="ContlrToggleTCS" value="Enum.KeyCode.DPadDown"></div>
+          <div class="field"><label>ContlrToggleABS</label><input type="text" data-control="ContlrToggleABS" value="Enum.KeyCode.DPadRight"></div>
         </div>
       </div>
     </div>
