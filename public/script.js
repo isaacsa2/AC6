@@ -482,8 +482,8 @@ function calcSus() {
   document.getElementById('s-wr-sub').textContent = Math.round((1-wd)*100)+'% traseiro';
   document.getElementById('s-wkg').textContent = Math.round(wKg)+' kg';
   
-  let fnF = Math.sqrt(fs/Math.max(.01,mF))/(2*Math.PI);
-  let fnR = Math.sqrt(rs/Math.max(.01,mR))/(2*Math.PI);
+  let fnF = Math.sqrt((fs / AC6_SUS_STIFFNESS_SCALE)/Math.max(.01,mF))/(2*Math.PI);
+  let fnR = Math.sqrt((rs / AC6_SUS_STIFFNESS_SCALE)/Math.max(.01,mR))/(2*Math.PI);
   document.getElementById('s-fnf').textContent = fnF.toFixed(2)+' Hz';
   document.getElementById('s-fnr').textContent = fnR.toFixed(2)+' Hz';
   
@@ -672,6 +672,7 @@ document.getElementById('unit-mph').addEventListener('click', () => {
 });
 
 /* Presets Suspensão */
+const AC6_SUS_STIFFNESS_SCALE = 0.38;
 const SUS_PRESETS={
   comfort:{frontHz:.52,rearHz:.58,damp:.020,rideF:.52,rideR:.55,headroom:1.45,len:2.0},
   road_air:{frontHz:.44,rearHz:.50,damp:.024,rideF:.78,rideR:.86,headroom:1.75,len:2.35},
@@ -687,8 +688,8 @@ function buildSuspensionPreset(profile) {
   let wR = wt * (1 - wd);
   let frontHz = profile.frontHz;
   let rearHz = Math.max(profile.rearHz, frontHz + .04);
-  let kF = Math.round(Math.pow(frontHz * 2 * Math.PI, 2) * wF);
-  let kR = Math.round(Math.pow(rearHz * 2 * Math.PI, 2) * wR);
+  let kF = Math.round(Math.pow(frontHz * 2 * Math.PI, 2) * wF * AC6_SUS_STIFFNESS_SCALE);
+  let kR = Math.round(Math.pow(rearHz * 2 * Math.PI, 2) * wR * AC6_SUS_STIFFNESS_SCALE);
   let sagF = wF / Math.max(1, kF);
   let sagR = wR / Math.max(1, kR);
   let fComp = Math.round(Math.max(.08, sagF * profile.headroom) * 100) / 100;
