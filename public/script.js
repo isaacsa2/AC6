@@ -4,6 +4,7 @@ let currentLang = 'pt';
 const CHASSIS_VARIANT = document.body?.dataset.chassisVariant || 'byisaacsa2';
 const IS_BYINSPARE = CHASSIS_VARIANT.toLowerCase() === 'byinspare';
 const STORAGE_KEY = IS_BYINSPARE ? 'ac6_byinspare_saved_tune' : 'ac6c_saved_tune';
+const AC6_SUS_STIFFNESS_SCALE = 0.38;
 let chassisTemplateSource = '';
 
 function hideElement(el) {
@@ -672,7 +673,6 @@ document.getElementById('unit-mph').addEventListener('click', () => {
 });
 
 /* Presets Suspensão */
-const AC6_SUS_STIFFNESS_SCALE = 0.38;
 const SUS_PRESETS={
   comfort:{frontHz:.52,rearHz:.58,damp:.020,rideF:.52,rideR:.55,headroom:1.45,len:2.0},
   road_air:{frontHz:.44,rearHz:.50,damp:.024,rideF:.78,rideR:.86,headroom:1.75,len:2.35},
@@ -1073,7 +1073,15 @@ document.getElementById('sw-copy-btn').addEventListener('click', () => {
 const impBack = document.getElementById('import-modal-backdrop');
 const impTA = document.getElementById('import-textarea');
 const impSt = document.getElementById('import-status');
-document.getElementById('open-import-btn').addEventListener('click', () => impBack.classList.add('open'));
+function setImportStatus(message, isError) {
+  impSt.textContent = message;
+  impSt.className = 'import-status' + (isError ? ' err' : '');
+  impSt.style.display = '';
+}
+document.getElementById('open-import-btn').addEventListener('click', () => {
+  impSt.style.display = 'none';
+  impBack.classList.add('open');
+});
 document.getElementById('import-modal-close').addEventListener('click', () => impBack.classList.remove('open'));
 document.getElementById('import-modal-close2').addEventListener('click', () => impBack.classList.remove('open'));
 impBack.addEventListener('click', e => { if(e.target===impBack) impBack.classList.remove('open'); });
@@ -1173,6 +1181,47 @@ document.getElementById('import-apply-btn').addEventListener('click', () => {
     showToast('Nenhum campo reconhecido.', 'error');
   }
 });
+
+document.getElementById('import-file-input').addEventListener('change', e => {
+  e.stopImmediatePropagation();
+  let f = e.target.files[0];
+  if(!f) return;
+  let r = new FileReader();
+  r.onload = ev => {
+    impTA.value = ev.target.result || '';
+    setImportStatus('OK ' + f.name, false);
+    e.target.value = '';
+  };
+  r.onerror = () => {
+    setImportStatus('Erro ao ler ' + f.name, true);
+    e.target.value = '';
+  };
+  r.readAsText(f);
+}, true);
+
+document.getElementById('import-apply-btn').addEventListener('click', e => {
+  e.stopImmediatePropagation();
+  let txt = impTA.value;
+  if(!txt.trim()){
+    setImportStatus('Cole ou carregue um Tune', true);
+    return;
+  }
+  try {
+    let applied = applyTuneTextToForm(txt);
+    if(applied > 0) {
+      setImportStatus(applied + ' campos aplicados', false);
+      showToast(`${applied} campos aplicados!`, 'success');
+      setTimeout(() => impBack.classList.remove('open'), 700);
+    } else {
+      setImportStatus('Nenhum campo reconhecido', true);
+      showToast('Nenhum campo reconhecido.', 'error');
+    }
+  } catch(err) {
+    console.error(err);
+    setImportStatus('Erro ao aplicar Tune: ' + (err && err.message ? err.message : 'falha desconhecida'), true);
+    showToast('Erro ao aplicar Tune.', 'error');
+  }
+}, true);
 
 window.addEventListener('DOMContentLoaded', () => {
   let templatePath = IS_BYINSPARE ? '/chassis/AC6byInspareTUNE.luau' : '/chassis/AC6byisaacsa2TUNE.luau';
