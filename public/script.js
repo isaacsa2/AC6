@@ -778,18 +778,51 @@ document.getElementById('unit-mph').addEventListener('click', () => {
 
 /* Presets Suspensão */
 const SUS_PRESETS={
-  comfort:{fstiff:8000,fdamp:150,fprecomp:0.8,rstiff:7000,rdamp:130,rprecomp:0.7},
-  sport:  {fstiff:18000,fdamp:350,fprecomp:0.5,rstiff:20000,rdamp:380,rprecomp:0.45},
-  race:   {fstiff:38000,fdamp:700,fprecomp:0.25,rstiff:42000,rdamp:750,rprecomp:0.2},
-  offroad:{fstiff:6000,fdamp:200,fprecomp:1.2,rstiff:5500,rdamp:180,rprecomp:1.3}
+  comfort:{frontHz:.52,rearHz:.58,damp:.020,rideF:.52,rideR:.55,headroom:1.45,len:2.0},
+  road_air:{frontHz:.44,rearHz:.50,damp:.024,rideF:.78,rideR:.86,headroom:1.75,len:2.35},
+  sport:{frontHz:.68,rearHz:.76,damp:.023,rideF:.40,rideR:.42,headroom:1.25,len:1.85},
+  race:{frontHz:.86,rearHz:.98,damp:.026,rideF:.28,rideR:.30,headroom:1.08,len:1.65},
+  offroad:{frontHz:.46,rearHz:.52,damp:.030,rideF:1.02,rideR:1.10,headroom:1.95,len:2.65}
 };
+
+function buildSuspensionPreset(profile) {
+  let wt = Math.max(100, v('weight'));
+  let wd = Math.max(0, Math.min(1, v('wdist') / 100));
+  let wF = wt * wd;
+  let wR = wt * (1 - wd);
+  let frontHz = profile.frontHz;
+  let rearHz = Math.max(profile.rearHz, frontHz + .04);
+  let kF = Math.round(Math.pow(frontHz * 2 * Math.PI, 2) * wF);
+  let kR = Math.round(Math.pow(rearHz * 2 * Math.PI, 2) * wR);
+  let sagF = wF / Math.max(1, kF);
+  let sagR = wR / Math.max(1, kR);
+  let fComp = Math.round(Math.max(.08, sagF * profile.headroom) * 100) / 100;
+  let rComp = Math.round(Math.max(.08, sagR * profile.headroom) * 100) / 100;
+  let fExt = Math.round(Math.max(.25, profile.rideF * .75) * 100) / 100;
+  let rExt = Math.round(Math.max(.25, profile.rideR * .75) * 100) / 100;
+  return {
+    fstiff:kF,
+    rstiff:kR,
+    fdamp:Math.round(kF * profile.damp),
+    rdamp:Math.round(kR * profile.damp),
+    flen:profile.len,
+    rlen:profile.len,
+    fprecomp:Math.round((profile.rideF + sagF) * 100) / 100,
+    rprecomp:Math.round((profile.rideR + sagR) * 100) / 100,
+    fcomp:fComp,
+    rcomp:rComp,
+    fext:fExt,
+    rext:rExt
+  };
+}
 document.querySelectorAll('.sus-preset').forEach(btn => {
   btn.addEventListener('click', () => {
-    let p = SUS_PRESETS[btn.dataset.preset];
-    if(!p) return;
+    let preset = SUS_PRESETS[btn.dataset.preset];
+    if(!preset) return;
+    let p = buildSuspensionPreset(preset);
     Object.keys(p).forEach(k => { let el=document.getElementById(k); if(el) el.value=p[k]; });
     calc();
-    showToast('Preset de suspensão aplicado!', 'success');
+    showToast(btn.dataset.preset === 'road_air' ? 'Suspensão rodoviária a ar aplicada!' : 'Preset de suspensão aplicado pelo peso atual!', 'success');
   });
 });
 
