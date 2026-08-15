@@ -6,11 +6,14 @@ export default {
     const url = new URL(request.url);
     const origin = "https://ac6.isaacsa2.online";
 
+    if (url.pathname === "/byinspare" || url.pathname.startsWith("/byinspare/")) {
+      return Response.redirect(new URL("/", request.url).toString(), 302);
+    }
+
     if (url.pathname === "/sitemap.xml") {
-      const lastmod = "2026-07-04";
+      const lastmod = "2026-08-15";
       const urls = [
         { loc: `${origin}/`, priority: "1.0" },
-        { loc: `${origin}/byinspare/`, priority: "0.8" },
       ];
       const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

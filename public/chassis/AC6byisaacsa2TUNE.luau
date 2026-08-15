@@ -13,7 +13,7 @@
 local Tune = {}
 
 --[[Misc]]
-Tune.LoadDelay		= 1.0		-- Delay before initializing chassis (in seconds)
+Tune.LoadDelay		= 1		-- Delay before initializing chassis (in seconds)
 Tune.AutoStart		= false		-- Set to false if using manual ignition plugin
 Tune.AutoFlip		= true		-- Set to false if using manual flip plugin
 
@@ -33,16 +33,16 @@ Tune.WeightBSize	= {			-- Size of weight brick, dimensions of your car in inches
 	--[[Width]]		10.4		,
 	--[[Height]]		11.6		,
 	--[[Length]]		47		}
-Tune.WeightDist		= 55		-- Weight distribution (0 - on rear wheels, 100 - on front wheels, can be <0 or >100)
+Tune.WeightDist		= 45		-- Weight distribution (0 - on rear wheels, 100 - on front wheels, can be <0 or >100)
 Tune.CGHeight		= 1.4		-- Center of gravity height (studs relative to median of all wheels)
 Tune.WBVisible		= false		-- Makes the weight brick visible
 
 --Unsprung Weight
-Tune.FWheelDensity	= .2		-- Front Wheel Density
-Tune.RWheelDensity	= .2		-- Rear Wheel Density
+Tune.FWheelDensity	= 0.2		-- Front Wheel Density
+Tune.RWheelDensity	= 0.2		-- Rear Wheel Density
 
 Tune.AxleSize		=  2		-- Size of structural members (larger = MORE STABLE / carry more weight)
-Tune.AxleDensity	= .1		-- Density of structural members
+Tune.AxleDensity	= 0.1		-- Density of structural members
 
 Tune.CustomSuspensionDensity	= 0.01	-- Density of suspension joints, only applies to custom suspension
 
@@ -51,21 +51,21 @@ Tune.SuspensionEnabled	= true		-- Enables suspension, true or false
 
 --Front Strut
 Tune.FSusStiffness	= 16000		-- Spring Force
-Tune.FSusDamping	= 300		-- Spring Damping
+Tune.FSusDamping	= 200		-- Spring Damping
 Tune.FSusLength		= 2			-- Base spring height (in studs)
-Tune.FPreCompress	= .6		-- Adds to base spring height (in studs)
-Tune.FExtensionLim	= .4		-- Max Extension Travel (in studs)
-Tune.FCompressLim	= .1		-- Max Compression Travel (in studs)
+Tune.FPreCompress	= 0.6		-- Adds to base spring height (in studs)
+Tune.FExtensionLim	= 0.4		-- Max Extension Travel (in studs)
+Tune.FCompressLim	= 0.1		-- Max Compression Travel (in studs)
 
 Tune.FGyroDampening = 50		-- Front Suspension Gyro Dampening
 
 --Rear Strut
 Tune.RSusStiffness	= 16000		-- Spring Force
-Tune.RSusDamping	= 300		-- Spring Damping
+Tune.RSusDamping	= 250		-- Spring Damping
 Tune.RSusLength		= 2			-- Base spring height (in studs)
-Tune.RPreCompress	= .6		-- Adds to base spring height (in studs)
-Tune.RExtensionLim	= .4		-- Max Extension Travel (in studs)
-Tune.RCompressLim	= .1		-- Max Compression Travel (in studs)
+Tune.RPreCompress	= 0.6		-- Adds to base spring height (in studs)
+Tune.RExtensionLim	= 0.4		-- Max Extension Travel (in studs)
+Tune.RCompressLim	= 0.1		-- Max Compression Travel (in studs)
 
 Tune.RGyroDampening = 50		-- Rear Suspension Gyro Dampening
 
@@ -106,20 +106,20 @@ Tune.FGyroDamp		= 100		-- Front Wheel Non-Axial Dampening
 Tune.RGyroDamp		= 100		-- Rear Wheel Non-Axial Dampening
 
 --[[Steering]]
-Tune.SteeringType	= 'New'		-- New = Precise steering calculations based on real life steering assembly (LuaInt)
+Tune.SteeringType	= "New"		-- New = Precise steering calculations based on real life steering assembly (LuaInt)
 -- Old = Previous steering calculations
 -- New Options
-Tune.SteerRatio		= 9/1		-- Steering ratio of your steering rack, google it for your car
+Tune.SteerRatio		= 9		-- Steering ratio of your steering rack, google it for your car
 Tune.LockToLock		= 2.6		-- Number of turns of the steering wheel lock to lock, google it for your car
-Tune.Ackerman		= .9		-- If you don't know what it is don't touch it, ranges from .7 to 1.2
+Tune.Ackerman		= 0.9		-- If you don't know what it is don't touch it, ranges from .7 to 1.2
 
 -- Old Options
 Tune.SteerInner		= 60		-- Inner wheel steering angle (in degrees)
 Tune.SteerOuter		= 60		-- Outer wheel steering angle (in degrees)
 
 -- General Steering
-Tune.SteerSpeed		= .025		-- Steering increment per tick (in degrees)
-Tune.ReturnSpeed	= .04		-- Steering increment per tick (in degrees)
+Tune.SteerSpeed		= 0.025		-- Steering increment per tick (in degrees)
+Tune.ReturnSpeed	= 0.04		-- Steering increment per tick (in degrees)
 Tune.SteerDecay		= 250		-- Speed of gradient cutoff (in SPS)
 Tune.MinSteer		= 10		-- Minimum steering at max steer decay (in percent)
 Tune.MSteerExp		= 1			-- Mouse steering exponential degree
@@ -130,7 +130,7 @@ Tune.SteerMaxTorque	= 45000		-- Steering Force
 Tune.SteerP			= 100000	-- Steering Aggressiveness
 
 --Four Wheel Steering (LuaInt)
-Tune.FWSteer			= 'None'	-- Static, Speed, Both, or None
+Tune.FWSteer			= "Both"	-- Static, Speed, Both, or None
 Tune.RSteerOuter		= 10		-- Outer rear wheel steering angle (in degrees)
 Tune.RSteerInner		= 10		-- Inner rear wheel steering angle (in degrees)
 Tune.RSteerSpeed		= 60		-- Speed at which 4WS fully activates (Speed), deactivates (Static), or transition begins (Both) (SPS)
@@ -152,15 +152,15 @@ Tune.RSteerP			= 100000	-- Steering Aggressiveness
 -- Naturally Aspirated Engine
 Tune.Engine 		= true
 
-Tune.Horsepower		= 177 	-- Naturally aspirated horsepower, before adding forced induction
+Tune.Horsepower		= 220 	-- Naturally aspirated horsepower, before adding forced induction
 Tune.IdleRPM		= 800	-- Engine idle
 Tune.PeakRPM		= 6400	-- Where horsepower reaches peak
 Tune.Redline		= 6800	-- Your engine's rev limiter
-Tune.PeakSharpness	= 6.5	-- How fast power drops off past peak horsepower
-Tune.CurveMult		= .2	-- Higher values mean a peakier power curve, lower values being smoother
+Tune.PeakSharpness	= 3.1	-- How fast power drops off past peak horsepower
+Tune.CurveMult		= 0.62	-- Higher values mean a peakier power curve, lower values being smoother
 Tune.EqPoint		= 5252	-- Standardized, do not touch
 
-Tune.CompressionRatio	= 8.5 -- Only affects cars with forced induction, Google this value
+Tune.CompressionRatio	= 11.4 -- Only affects cars with forced induction, Google this value
 
 -- Electric Engine
 Tune.Electric		= false
@@ -181,37 +181,37 @@ Tune.ET_EndPercent	= 27.5
 -- Turbocharger
 Tune.Turbochargers	= 1			-- Number of turbochargers in the engine, set to 0 for no turbochargers
 
-Tune.T_Boost		= 6
+Tune.T_Boost		= 3
 Tune.T_BoostLag		= 300		-- Turbo lag overall
 Tune.T2_BoostLag	= 400		-- (ONLY ACTIVE ON TWIN TURBO CARS) Second turbo lag, equal to the first turbo lag or greater if you're using sequential turbos
 
 -- Supercharger
-Tune.Superchargers	= 0				-- Number of superchargers in the engine
-Tune.S_Boost		= 4
+Tune.Superchargers	= 1				-- Number of superchargers in the engine
+Tune.S_Boost		= 3
 Tune.S_Sensitivity	= 0.1		-- Supercharger responsiveness/sensitivity, applied per tick (recommended values between 0.05 to 0.1)
 
 --Misc
-Tune.ThrotAccel		= .05		-- Throttle acceleration, applied per tick (recommended values between 0.05 to 0.1)
-Tune.ThrotDecel		= .2		-- Throttle deceleration, applied per tick (recommended values between 0.1 to 0.3)
+Tune.ThrotAccel		= 0.025		-- Throttle acceleration, applied per tick (recommended values between 0.05 to 0.1)
+Tune.ThrotDecel		= 0.15		-- Throttle deceleration, applied per tick (recommended values between 0.1 to 0.3)
 
-Tune.BrakeAccel		= .2		-- Brake acceleration, applied per tick
-Tune.BrakeDecel		= .5		-- Brake deceleration, applied per tick
+Tune.BrakeAccel		= 0.15		-- Brake acceleration, applied per tick
+Tune.BrakeDecel		= 0.25		-- Brake deceleration, applied per tick
 
-Tune.RevAccel		= 250		-- RPM acceleration when clutch is off
-Tune.RevDecay		= 75		-- RPM decay when clutch is off
-Tune.RevBounce		= 250		-- RPM kickback from redline
+Tune.RevAccel		= 50		-- RPM acceleration when clutch is off
+Tune.RevDecay		= 15		-- RPM decay when clutch is off
+Tune.RevBounce		= 50		-- RPM kickback from redline
 
 Tune.IdleThrottle	= 3			-- Percent throttle at idle
-Tune.Flywheel		= 300		-- Flywheel weight (higher = faster response, lower = more stable RPM)
+Tune.Flywheel		= 250		-- Flywheel weight (higher = faster response, lower = more stable RPM)
 
 Tune.InclineComp	= 1			-- Torque compensation multiplier for inclines (applies gradient from 0-90 degrees)
 
 --[[Drivetrain]]
 Tune.Config			= "RWD"		-- "FWD" , "RWD" , "AWD"
-Tune.TorqueVector	= .3		-- AWD ONLY, "-1" has a 100% front bias, "0" has a 50:50 bias, and "1" has a 100% rear bias. Can be any number between that range.
+Tune.TorqueVector	= 0.3		-- AWD ONLY, "-1" has a 100% front bias, "0" has a 50:50 bias, and "1" has a 100% rear bias. Can be any number between that range.
 
 -- Differential Settings
-Tune.DifferentialType = 'New'	-- New: Fairly precise and accurate settings based on a real differential
+Tune.DifferentialType = "New"	-- New: Fairly precise and accurate settings based on a real differential
 -- Old: Same differential as previous iterations of AC6
 
 -- Old Options
@@ -274,7 +274,7 @@ Tune.KickSpeedThreshold = 20	-- Speed limit on launch (SPS)
 Tune.KickRPMThreshold 	= 2000	-- RPM limit on launch, range is created below redline
 
 --Clutch: "Old" mode
-Tune.ClutchRPMMult	= 1.0		-- Clutch RPM multiplier, recommended to leave at 1.0
+Tune.ClutchRPMMult	= 1		-- Clutch RPM multiplier, recommended to leave at 1.0
 
 --Torque Converter:
 Tune.TQLock 		= false		-- Torque converter starts locking at a certain RPM
@@ -307,20 +307,19 @@ Tune.AutoDownThresh = 1400		-- Automatic downshift point (relative to peak RPM, 
 Tune.ShiftThrot		= 100		-- Throttle level when shifting down to revmatch, 0 - 100%
 
 --Automatic: DCT
-Tune.ShiftUpTime	= 0.30		-- Time required to shift into next gear, from a lower gear to a higher one.
-Tune.ShiftDnTime	= 0.25		-- Time required to shift into next gear, from a higher gear to a lower one.
+Tune.ShiftUpTime	= 0.5		-- Time required to shift into next gear, from a lower gear to a higher one.
+Tune.ShiftDnTime	= 0.65		-- Time required to shift into next gear, from a higher gear to a lower one.
 
 --Gear Ratios
-Tune.FinalDrive		= 9.40			-- Gearing determines top speed and wheel torque
-Tune.Ratios			= {				-- Higher ratio = more torque, Lower ratio = higher top speed
-	--[[Reverse]]	8.65,
-	--[[Neutral]]	0,
-	--[[ 1 ]]		9.20,
-	--[[ 2 ]]		5.23,
-	--[[ 3 ]]		3.15,
-	--[[ 4 ]]		2.03,
-	--[[ 5 ]]		1.37,
-	--[[ 6 ]]		1.00,
+Tune.FinalDrive		= 8.45			-- Gearing determines top speed and wheel torque
+Tune.Ratios			= {
+	--[[Reverse]]	6.29	,
+	--[[Neutral]]	0	,
+	--[[1]]		6.7	,
+	--[[2]]		3.81	,
+	--[[3]]		2.29	,
+	--[[4]]		1.48	,
+	--[[5]]		1	,
 }
 Tune.FDMult			= 1			-- Ratio multiplier (keep this at 1 if car is not struggling with torque)
 
@@ -329,7 +328,7 @@ Tune.ABSEnabled		= false		-- Implements ABS
 Tune.ABSThreshold	= 20		-- Slip speed allowed before ABS starts working (in SPS)
 
 Tune.BrakeForce		= 10400		-- Total brake force (LuaInt)
-Tune.BrakeBias		= .6		-- Brake bias towards the front, percentage (1 = Front, 0 = Rear, .5 = 50/50)
+Tune.BrakeBias		= 0.6		-- Brake bias towards the front, percentage (1 = Front, 0 = Rear, .5 = 50/50)
 Tune.PBrakeForce	= 0		-- Handbrake force
 Tune.PBrakeBias		= 0			-- Handbrake bias towards the front, percentage (1 = Front, 0 = Rear, .5 = 50/50)
 Tune.EBrakeForce	= 800		-- Engine braking force at redline
@@ -346,53 +345,43 @@ Tune.Peripherals = {
 
 --Control Mapping
 Tune.Controls = {
-
-	--Keyboard Controls
-	--Mode Toggles
-	ToggleTCS				= Enum.KeyCode.T					,
-	ToggleABS				= Enum.KeyCode.Y					,
+	ToggleTCS			= Enum.KeyCode.T				,
+	ToggleABS			= Enum.KeyCode.Y				,
 	ToggleTransMode			= Enum.KeyCode.LeftAlt				,
-	ToggleMouseDrive		= Enum.KeyCode.Insert				,
+	ToggleMouseDrive			= Enum.KeyCode.Insert				,
 
-	--Primary Controls
-	Throttle				= Enum.KeyCode.Up					,
-	Brake					= Enum.KeyCode.Down					,
-	SteerLeft				= Enum.KeyCode.Left					,
-	SteerRight				= Enum.KeyCode.Right				,
+	Throttle			= Enum.KeyCode.Up				,
+	Brake			= Enum.KeyCode.Down				,
+	SteerLeft			= Enum.KeyCode.Left				,
+	SteerRight			= Enum.KeyCode.Right				,
 
-	--Secondary Controls
-	Throttle2				= Enum.KeyCode.W					,
-	Brake2					= Enum.KeyCode.S					,
-	SteerLeft2				= Enum.KeyCode.A					,
-	SteerRight2				= Enum.KeyCode.D					,
+	Throttle2			= Enum.KeyCode.W				,
+	Brake2			= Enum.KeyCode.S				,
+	SteerLeft2			= Enum.KeyCode.A				,
+	SteerRight2			= Enum.KeyCode.D				,
 
-	--Manual Transmission
-	ShiftUp					= Enum.KeyCode.E					,
-	ShiftDown				= Enum.KeyCode.Q					,
-	Clutch					= Enum.KeyCode.LeftShift			,
+	ShiftUp			= Enum.KeyCode.E				,
+	ShiftDown			= Enum.KeyCode.Q				,
+	Clutch			= Enum.KeyCode.LeftShift				,
+	PBrake			= Enum.KeyCode.Asterisk				,
 
-	--Handbrake
-	PBrake					= Enum.KeyCode.Asterisk				,
+	MouseThrottle			= Enum.UserInputType.MouseButton1				,
+	MouseBrake			= Enum.UserInputType.MouseButton2				,
+	MouseClutch			= Enum.KeyCode.W				,
+	MouseShiftUp			= Enum.KeyCode.E				,
+	MouseShiftDown			= Enum.KeyCode.Q				,
+	MousePBrake			= Enum.KeyCode.LeftShift				,
 
-	--Mouse Controls
-	MouseThrottle			= Enum.UserInputType.MouseButton1	,
-	MouseBrake				= Enum.UserInputType.MouseButton2	,
-	MouseClutch				= Enum.KeyCode.W					,
-	MouseShiftUp			= Enum.KeyCode.E					,
-	MouseShiftDown			= Enum.KeyCode.Q					,
-	MousePBrake				= Enum.KeyCode.LeftShift			,
-
-	--Controller Mapping
 	ContlrThrottle			= Enum.KeyCode.ButtonR2				,
-	ContlrBrake				= Enum.KeyCode.ButtonL2				,
-	ContlrSteer				= Enum.KeyCode.Thumbstick1			,
+	ContlrBrake			= Enum.KeyCode.ButtonL2				,
+	ContlrSteer			= Enum.KeyCode.Thumbstick1				,
 	ContlrShiftUp			= Enum.KeyCode.ButtonY				,
 	ContlrShiftDown			= Enum.KeyCode.ButtonX				,
 	ContlrClutch			= Enum.KeyCode.ButtonR1				,
 	ContlrPBrake			= Enum.KeyCode.ButtonL1				,
-	ContlrToggleTMode		= Enum.KeyCode.DPadUp				,
+	ContlrToggleTMode			= Enum.KeyCode.DPadUp				,
 	ContlrToggleTCS			= Enum.KeyCode.DPadDown				,
-	ContlrToggleABS			= Enum.KeyCode.DPadRight			,
+	ContlrToggleABS			= Enum.KeyCode.DPadRight				,
 }
 
 return Tune
