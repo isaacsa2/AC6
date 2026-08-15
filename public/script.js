@@ -144,11 +144,11 @@ function debounce(func, wait) {
 
 /* ─────────── MATEMÁTICA & FÍSICA ─────────── */
 function curveNfull(RPM, hp, peak, sharp, curveMult) {
-  if(RPM <= 0 || peak <= 0 || hp <= 0) return 0;
-  let r = RPM/1000, p = peak/1000, H = hp/100;
-  if(H <= 0) return 0;
-  let base = (-(r-p)*(r-p)) * Math.min(H/Math.pow(p,2), Math.pow(curveMult, p/H)) + H;
-  return base * (r - (Math.pow(r, sharp) / (sharp * Math.pow(p, sharp-1))));
+  return AC6Math.curveRaw(RPM, hp, {
+    peakRPM: peak,
+    peakSharpness: sharp,
+    curveMult
+  });
 }
 
 function smoothTorqueCurve(samples, amount, windowSize) {
@@ -261,89 +261,193 @@ function autoSmoothDynoCurve(labels, hpSamples, torqueSamples) {
   return { hp: best.hp, torque: best.torque };
 }
 
-function calcCombustionDynoSamples(overrides = {}) {
-  let hp = v('hp'), peak = overrides.peak || v('peakrpm'), redline = v('redline'), cr = v('cr');
-  let tEn = chk('turbo-en'), tc = tEn ? v('tcount') : 0, tb = tEn ? v('tboost') : 0;
-  let sEn = chk('super-en'), sc = sEn ? v('scount') : 0, sb = sEn ? v('sboost') : 0;
-  let sharp = overrides.sharp || v('sharp') || 6.5, cm = overrides.curveMult || v('curvemult') || 0.2;
-  let TPsi = tb * tc, SPsi = sb * sc;
-  let HTc = ((hp * TPsi * (cr / 10) / 7.5) / 2) / 100;
-  let HSc = ((hp * SPsi * (cr / 10) / 7.5) / 2) / 100;
-  let HT = HTc * 100, HS = HSc * 100;
-  let peakNA = Math.max(0.0001, curveNfull(peak, hp, peak, sharp, cm));
-  let steps = 80, labels = [], hpSamples = [], torqueSamples = [];
-
-  for(let i = 0; i <= steps; i++) {
-    let rpm = redline * i / steps;
-    labels.push(Math.round(rpm));
-    let naR = Math.max(0, curveNfull(rpm, hp, peak, sharp, cm));
-    let naHP = (naR / peakNA) * hp;
-    let tR = Math.max(0, curveNfull(rpm, Math.max(1, HTc * 100), peak, sharp, cm));
-    let tHP = (tEn && tc > 0) ? (tR / peakNA) * HT : 0;
-    let sR = Math.max(0, curveNfull(rpm, Math.max(1, HSc * 100), peak, sharp, cm));
-    let sHP = (sEn && sc > 0) ? (sR / peakNA) * HS : 0;
-    let totalHP = Math.max(0, Math.round((naHP + tHP + sHP) * 10) / 10);
-    hpSamples.push(totalHP);
-    torqueSamples.push(rpm > 100 ? Math.round((totalHP * 5252) / rpm) : 0);
+function updateDynoGearOptions() {
+  const select = document.getElementById('dyno-gear');
+  if(!select) return 0;
+  const ratios = getGearSetup().ratios;
+  const previous = Math.max(0, Math.min(ratios.length - 1, parseInt(select.value, 10) || 0));
+  if(select.options.length !== ratios.length) {
+    select.innerHTML = '';
+    ratios.forEach((ratio, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = (index + 1) + 'ª · ' + ratio.toFixed(2) + ':1';
+      select.appendChild(option);
+    });
   }
+  select.value = String(previous);
+  return previous;
+}
 
-  return { labels, hp: hpSamples, torque: torqueSamples };
+function getAc6Config(overrides = {}) {
+  const gear = getGearSetup();
+  const gearIndex = updateDynoGearOptions();
+  const ratio = gear.ratios[gearIndex] || gear.lastRatio || 1;
+  const scenario = s('dyno-mode') || 'settled';
+  return Object.assign({
+    engine: chk('engine-en'),
+    electric: chk('elec-en'),
+    horsepower: v('hp'),
+    peakRPM: v('peakrpm'),
+    redline: v('redline'),
+    peakSharpness: v('sharp'),
+    curveMult: v('curvemult'),
+    eqPoint: v('eqpoint') || 5252,
+    compressionRatio: v('cr'),
+    turboCount: chk('turbo-en') ? Math.max(0, v('tcount')) : 0,
+    turboBoost: chk('turbo-en') ? Math.max(0, v('tboost')) : 0,
+    turboLag: Math.max(0.0001, v('tlag')),
+    turboLag2: Math.max(0.0001, v('t2lag') || v('tlag')),
+    superCount: chk('super-en') ? Math.max(0, v('scount')) : 0,
+    superBoost: chk('super-en') ? Math.max(0, v('sboost')) : 0,
+    superSensitivity: Math.max(0, v('ssens')),
+    throttleAccel: Math.max(0, v('throtaccel')),
+    throttleDecel: Math.max(0, v('throtdecel')),
+    eRedline: v('e-redline'),
+    eTrans1: v('e-trans1'),
+    eTrans2: v('e-trans2'),
+    eHorsepower: v('e-hp'),
+    ehFrontMult: v('e-hfrontmult'),
+    ehEndMult: v('e-hendmult'),
+    ehEndPercent: v('e-hendpct'),
+    eTorque: v('e-tq'),
+    etEndMult: v('e-tqendmult'),
+    etEndPercent: v('e-tqendpct'),
+    finalDrive: gear.fd,
+    fdMult: gear.fdMult,
+    ratio,
+    gearIndex,
+    wheelDiameter: gear.wheelDiameter,
+    scenario,
+    throttle: scenario === 'settled' ? 1 : Math.max(0, Math.min(1, v('dyno-throttle') / 100)),
+    duration: scenario === 'settled' ? 0 : Math.max(0, v('dyno-duration'))
+  }, overrides);
+}
+
+function calcCombustionDynoSamples(overrides = {}) {
+  const config = getAc6Config(Object.assign({
+    electric: false,
+    scenario: 'settled',
+    throttle: 1,
+    duration: 0
+  }, {
+    peakRPM: overrides.peak || v('peakrpm'),
+    peakSharpness: overrides.sharp || v('sharp'),
+    curveMult: overrides.curveMult || v('curvemult')
+  }));
+  const result = AC6Math.buildDyno(config);
+  return {
+    labels: result.samples.map(sample => sample.rpm),
+    hp: result.samples.map(sample => Math.max(0, Math.round(sample.totalHP * 10) / 10)),
+    torque: result.samples.map(sample => Math.max(0, Math.round(sample.engineTorque)))
+  };
 }
 
 function calcHP() {
-  let hp = v('hp'), peak = v('peakrpm'), redline = v('redline'), cr = v('cr');
-  let tEn = chk('turbo-en'), tc = tEn ? v('tcount') : 0, tb = tEn ? v('tboost') : 0;
-  let sEn = chk('super-en'), sc = sEn ? v('scount') : 0, sb = sEn ? v('sboost') : 0;
-  let sharp = v('sharp') || 6.5, cm = v('curvemult') || 0.2;
-  let tqSmooth = chk('torque-smooth-en');
-  
-  let TPsi = tb*tc, SPsi = sb*sc;
-  let HTc = ((hp*TPsi*(cr/10)/7.5)/2)/100, HSc = ((hp*SPsi*(cr/10)/7.5)/2)/100;
-  let HT = HTc*100, HS = HSc*100;
-  let peakNA = Math.max(0.0001, curveNfull(peak, hp, peak, sharp, cm));
+  const config = getAc6Config();
+  const result = AC6Math.buildDyno(config);
+  window._ac6Result = Object.assign({ config }, result);
 
-  document.getElementById('r-na').textContent = Math.round(hp);
-  document.getElementById('r-turbo').textContent = (tEn && tc>0) ? '+'+Math.round(HT) : '+0';
-  document.getElementById('r-turbo-sub').textContent = (tEn && tc>0) ? tc+'× @ '+tb+' PSI' : 'desativado';
-  document.getElementById('r-super').textContent = (sEn && sc>0) ? '+'+Math.round(HS) : '+0';
-  document.getElementById('r-super-sub').textContent = (sEn && sc>0) ? sc+'× @ '+sb+' PSI' : 'desativado';
-  document.getElementById('r-total').textContent = Math.round(hp + HT + HS);
-  
-  let fText = document.getElementById('formula-text');
-  if(fText) fText.textContent = 'HP_NA='+Math.round(hp)+' HP_T='+(tEn&&tc>0?Math.round(HT):0)+' HP_S='+(sEn&&sc>0?Math.round(HS):0)+'\nTOTAL='+Math.round(hp+HT+HS)+' HP';
+  const peakNA = result.peakNA || { naHP: 0, rpm: 0 };
+  const peakTurbo = result.peakTurbo || { turboHP: 0, rpm: 0 };
+  const peakSuper = result.peakSuper || { superHP: 0, rpm: 0 };
+  const peakTotal = result.peakTotal || { totalHP: 0, rpm: 0 };
+  const peakEngineTorque = result.peakEngineTorque || { engineTorque: 0, rpm: 0 };
+  const peakWheelTorque = result.peakWheelTorque || { wheelTorque: 0, rpm: 0 };
 
-  let samples = calcCombustionDynoSamples({ sharp, curveMult: cm, peak });
-  let labels = samples.labels, dTot = samples.hp, dTorque = samples.torque;
-  if(tqSmooth) {
-    let autoDyno = autoSmoothDynoCurve(labels, dTot, dTorque);
-    dTot = autoDyno.hp;
-    dTorque = autoDyno.torque;
+  document.getElementById('r-na').textContent = Math.round(peakNA.naHP);
+  document.getElementById('r-turbo').textContent = '+' + Math.round(peakTurbo.turboHP);
+  document.getElementById('r-turbo-sub').textContent = config.turboCount > 0
+    ? config.turboCount + '× @ ' + config.turboBoost + ' PSI · ' + Math.round(peakTurbo.rpm) + ' RPM'
+    : 'desativado';
+  document.getElementById('r-super').textContent = '+' + Math.round(peakSuper.superHP);
+  document.getElementById('r-super-sub').textContent = config.superCount > 0
+    ? config.superCount + '× @ ' + config.superBoost + ' PSI · ' + Math.round(peakSuper.rpm) + ' RPM'
+    : 'desativado';
+  document.getElementById('r-total').textContent = Math.round(peakTotal.totalHP);
+  document.getElementById('r-total-sub').textContent = Math.round(peakTotal.rpm) + ' RPM';
+  document.getElementById('r-peak-rpm').textContent = Math.round(peakTotal.rpm).toLocaleString('pt-BR');
+  document.getElementById('r-engine-torque').textContent = Math.round(peakEngineTorque.engineTorque).toLocaleString('pt-BR');
+  document.getElementById('r-wheel-torque').textContent = Math.round(peakWheelTorque.wheelTorque).toLocaleString('pt-BR');
+  document.getElementById('r-wheel-torque-sub').textContent = (config.gearIndex + 1) + 'ª · ratio ' + config.ratio.toFixed(2) + ' · antes dos eixos';
+  const speedMph = AC6Math.speedMphFromRedline(
+    config.engine ? config.redline : config.eRedline,
+    config.ratio,
+    config.finalDrive,
+    config.fdMult,
+    config.wheelDiameter
+  );
+  document.getElementById('r-gear-speed').textContent = spdFmt(speedMph);
+  document.getElementById('r-gear-speed-sub').textContent = (config.gearIndex + 1) + 'ª no redline';
+
+  const transient = config.scenario === 'transient';
+  const throttleInput = document.getElementById('dyno-throttle');
+  const durationInput = document.getElementById('dyno-duration');
+  if(throttleInput) throttleInput.disabled = !transient;
+  if(durationInput) durationInput.disabled = !transient;
+  document.getElementById('dyno-mode-title').textContent = transient ? 'Resposta temporal' : 'Boost estabilizado';
+  document.getElementById('dyno-mode-help').textContent = transient
+    ? 'Simula o spool do turbo e a sensibilidade do supercharger por ' + config.duration.toFixed(1) + ' s a ' + Math.round(config.throttle * 100) + '% de acelerador.'
+    : 'Curvas de cache do AC6 com turbo pleno e resposta do supercharger em carga total.';
+  document.getElementById('chart-caption').textContent = transient
+    ? 'Cenário temporal sobre o cache de 100 RPM do AC6.'
+    : 'Amostras de 100 RPM, como o cache do AC6.';
+
+  const formulaText = document.getElementById('formula-text');
+  if(formulaText) {
+    formulaText.textContent = 'Pico AC6 = ' + peakTotal.totalHP.toFixed(1) + ' HP @ ' + Math.round(peakTotal.rpm) + ' RPM\n' +
+      'Torque no motor = ' + peakEngineTorque.engineTorque.toFixed(1) + ' lbf.ft\n' +
+      'Torque na roda = torque × ratio × FinalDrive × FDMult';
   }
 
-  if(window._hpChart){
+  const labels = result.samples.map(sample => sample.rpm);
+  let hpData = result.samples.map(sample => Math.round(sample.totalHP * 10) / 10);
+  let torqueData = result.samples.map(sample => Math.round(sample.engineTorque));
+  if(chk('torque-smooth-en')) {
+    const preview = autoSmoothDynoCurve(labels, hpData, torqueData);
+    hpData = preview.hp;
+    torqueData = preview.torque;
+  }
+
+  if(window._hpChart) {
     window._hpChart.data.labels = labels;
-    window._hpChart.data.datasets[0].data = dTot;
-    window._hpChart.data.datasets[1].data = dTorque;
+    window._hpChart.data.datasets[0].data = hpData;
+    window._hpChart.data.datasets[1].data = torqueData;
     window._hpChart.update('none');
   } else {
     const ctx = document.getElementById('hpChart');
-    if(!ctx) return;
+    if(!ctx || typeof Chart === 'undefined') {
+      document.getElementById('chart-caption').textContent += ' Gráfico indisponível sem conexão; métricas calculadas normalmente.';
+      return;
+    }
     window._hpChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: labels,
+        labels,
         datasets: [
-          { label: 'Total HP', data: dTot, borderColor: '#39e58c', borderWidth: 2.5, pointRadius: 0, tension: .4, yAxisID: 'y' },
-          { label: 'Torque (lbf.ft)', data: dTorque, borderColor: '#f59e0b', borderWidth: 2, borderDash: [5,5], pointRadius: 0, tension: .4, yAxisID: 'y1' }
+          { label: 'Total HP', data: hpData, borderColor: '#39e58c', backgroundColor: 'rgba(57,229,140,.08)', fill: true, borderWidth: 2.5, pointRadius: 0, tension: .28, yAxisID: 'y' },
+          { label: 'Torque no motor (lbf.ft)', data: torqueData, borderColor: '#f59e0b', borderWidth: 2, borderDash: [5,5], pointRadius: 0, tension: .28, yAxisID: 'y1' }
         ]
       },
       options: {
-        responsive: true, maintainAspectRatio: false, animation: {duration: 0},
-        plugins: { legend: {display: false}, tooltip: {mode: 'index', intersect: false} },
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#111827',
+            borderColor: 'rgba(255,255,255,.12)',
+            borderWidth: 1,
+            titleColor: '#f9fafb',
+            bodyColor: '#d1d5db'
+          }
+        },
         scales: {
-          x: { ticks: {color: '#9ca3af'}, grid: {color: 'rgba(255,255,255,.05)'} },
-          y: { type: 'linear', display: true, position: 'left', title: {display:true, text:'Horsepower', color:'#9ca3af'}, ticks: {color: '#9ca3af'}, grid: {color: 'rgba(255,255,255,.05)'} },
-          y1: { type: 'linear', display: true, position: 'right', title: {display:true, text:'Torque', color:'#9ca3af'}, ticks: {color: '#9ca3af'}, grid: {drawOnChartArea: false} }
+          x: { title: { display: true, text: 'RPM', color: '#6b7280' }, ticks: { color: '#9ca3af', maxTicksLimit: 9 }, grid: { color: 'rgba(255,255,255,.045)' } },
+          y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Horsepower', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,.045)' } },
+          y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Torque', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { drawOnChartArea: false } }
         }
       }
     });
@@ -415,35 +519,47 @@ function fitTuneValuesToAutoDyno() {
 }
 
 function calcPW() {
-  let hp=v('hp'), tEn=chk('turbo-en'), tc=tEn?v('tcount'):0, tb=tEn?v('tboost'):0;
-  let sEn=chk('super-en'), sc=sEn?v('scount'):0, sb=sEn?v('sboost'):0, cr=v('cr');
-  let HT=((hp*tb*tc*(cr/10)/7.5)/2), HS=((hp*sb*sc*(cr/10)/7.5)/2);
-  let eEn=chk('elec-en'), eHp=eEn?v('e-hp'):0;
-  let hpT=hp+HT+HS+eHp, wt=v('weight'), wKg=wt/2.205, wTon=wKg/1000;
-  let hpPT=hpT/Math.max(.001,wTon), pw=hpT/Math.max(1,wt), rolRes=wt*.015;
-  
-  let targetMph = USE_KMH ? 100/1.60934 : 60;
-  let targetFtS = targetMph*1.467, mass = wt/32.2;
-  let fAt = (hpT*550)/88, accelG = (fAt/mass)/32.2, accelAvg = accelG*.60*32.2;
-  let t0 = targetFtS/Math.max(.01,accelAvg);
-  let targetLabel = USE_KMH ? '0–100 km/h' : '0–60 mph';
-  
-  let vTxt, vSub, vColor;
-  if(hpPT<50){ vTxt='Pesado demais'; vColor='#ef4444'; vSub='Motor subdimensionado'; }
-  else if(hpPT<100){ vTxt='Equilibrado'; vColor='#f59e0b'; vSub='Adequado, sem folga'; }
-  else if(hpPT<200){ vTxt='Bom'; vColor='#10b981'; vSub='Relação saudável'; }
-  else { vTxt='Excelente'; vColor='#3b82f6'; vSub='Motor superdimensionado'; }
-  
-  document.getElementById('pw-hppt').textContent = Math.round(hpPT)+' hp/t';
-  document.getElementById('pw-ratio').textContent = pw.toFixed(4)+' hp/lb';
-  document.getElementById('pw-060').textContent = t0.toFixed(2)+'s';
-  document.getElementById('pw-tqmin').textContent = Math.round(rolRes)+' lbf.ft';
-  document.getElementById('pw-accel').textContent = accelG.toFixed(3)+' g';
-  document.getElementById('pw-verdict-main').textContent = vTxt;
-  document.getElementById('pw-verdict-main').style.color = vColor;
-  document.getElementById('pw-verdict-sub').textContent = vSub;
-  let lbl060 = document.getElementById('lbl-060'); if(lbl060) lbl060.textContent = targetLabel+' est.';
-  document.getElementById('pw-formula-text').textContent='HP combustão='+(hp+HT+HS).toFixed(1)+(eEn?' + HP elétrico='+eHp:'')+'  TOTAL='+hpT.toFixed(1)+' HP\nPeso='+wt+' lbs / '+wKg.toFixed(0)+' kg / '+wTon.toFixed(3)+' t\nHP/t='+hpPT.toFixed(1)+'\n'+targetLabel+' est. = '+t0.toFixed(2)+' s';
+  const peak = window._ac6Result && window._ac6Result.peakTotal
+    ? window._ac6Result.peakTotal.totalHP
+    : 0;
+  const hpT = Math.max(0, peak);
+  const wt = v('weight');
+  const wKg = wt / 2.205;
+  const wTon = wKg / 1000;
+  const hpPT = hpT / Math.max(.001, wTon);
+  const pw = hpT / Math.max(1, wt);
+  const rolRes = wt * .015;
+
+  const targetMph = USE_KMH ? 100 / 1.60934 : 60;
+  const targetFtS = targetMph * 1.467;
+  const mass = wt / 32.2;
+  const forceAtReference = (hpT * 550) / 88;
+  const accelG = (forceAtReference / Math.max(.001, mass)) / 32.2;
+  const accelAvg = accelG * .60 * 32.2;
+  const t0 = targetFtS / Math.max(.01, accelAvg);
+  const targetLabel = USE_KMH ? '0–100 km/h' : '0–60 mph';
+
+  let verdict;
+  if(hpPT < 50) verdict = ['Pesado demais', '#ef4444', 'Motor subdimensionado'];
+  else if(hpPT < 100) verdict = ['Equilibrado', '#f59e0b', 'Adequado, sem folga'];
+  else if(hpPT < 200) verdict = ['Bom', '#10b981', 'Relação saudável'];
+  else verdict = ['Excelente', '#3b82f6', 'Motor superdimensionado'];
+
+  document.getElementById('pw-hppt').textContent = Math.round(hpPT) + ' hp/t';
+  document.getElementById('pw-ratio').textContent = pw.toFixed(4) + ' hp/lb';
+  document.getElementById('pw-060').textContent = Number.isFinite(t0) ? t0.toFixed(2) + 's' : '—';
+  document.getElementById('pw-tqmin').textContent = Math.round(rolRes) + ' lbf.ft';
+  document.getElementById('pw-accel').textContent = accelG.toFixed(3) + ' g';
+  document.getElementById('pw-verdict-main').textContent = verdict[0];
+  document.getElementById('pw-verdict-main').style.color = verdict[1];
+  document.getElementById('pw-verdict-sub').textContent = verdict[2];
+  document.getElementById('lbl-060').textContent = targetLabel + ' est.';
+  document.getElementById('pw-formula-text').textContent =
+    'Pico combinado da curva AC6=' + hpT.toFixed(1) + ' HP\n' +
+    'Peso=' + wt + ' lbs / ' + wKg.toFixed(0) + ' kg / ' + wTon.toFixed(3) + ' t\n' +
+    'HP/t=' + hpPT.toFixed(1) + '\n' +
+    targetLabel + ' est.=' + (Number.isFinite(t0) ? t0.toFixed(2) : '—') +
+    ' s\n\nAtenção: tempo, aceleração e resistência ao rolamento são estimativas; o Roblox ainda aplica grip, arrasto, perdas e lógica de câmbio.';
 }
 
 function calcClutch() {
@@ -526,6 +642,285 @@ function calcDrivetrain() {
   }
 }
 
+const AXLE_TOPOLOGY_PRESETS = {
+  rwd4x2: {
+    config: 'RWD', config2: '',
+    axles: [
+      { module: 1, axle: 1, role: 'Front', wheels: 2, driven: 0 },
+      { module: 1, axle: 2, role: 'Rear', wheels: 2, driven: 2 }
+    ]
+  },
+  fwd4x2: {
+    config: 'FWD', config2: '',
+    axles: [
+      { module: 1, axle: 1, role: 'Front', wheels: 2, driven: 2 },
+      { module: 1, axle: 2, role: 'Rear', wheels: 2, driven: 0 }
+    ]
+  },
+  awd4x4: {
+    config: 'AWD', config2: '',
+    axles: [
+      { module: 1, axle: 1, role: 'Front', wheels: 2, driven: 2 },
+      { module: 1, axle: 2, role: 'Rear', wheels: 2, driven: 2 }
+    ]
+  },
+  truck6x2: {
+    config: 'RWD', config2: '',
+    axles: [
+      { module: 1, axle: 1, role: 'Front', wheels: 2, driven: 0 },
+      { module: 1, axle: 2, role: 'Rear', wheels: 2, driven: 2 },
+      { module: 1, axle: 3, role: 'Rear', wheels: 2, driven: 0 }
+    ]
+  },
+  truck6x4: {
+    config: 'RWD', config2: '',
+    axles: [
+      { module: 1, axle: 1, role: 'Front', wheels: 2, driven: 0 },
+      { module: 1, axle: 2, role: 'Rear', wheels: 2, driven: 2 },
+      { module: 1, axle: 3, role: 'Rear', wheels: 2, driven: 2 }
+    ]
+  },
+  articulated: {
+    config: 'RWD', config2: 'RWD',
+    axles: [
+      { module: 1, axle: 1, role: 'Front', wheels: 2, driven: 0 },
+      { module: 1, axle: 2, role: 'Rear', wheels: 2, driven: 2 },
+      { module: 2, axle: 1, role: 'Rear', wheels: 2, driven: 2 }
+    ]
+  }
+};
+
+let axleTopologyState = {
+  confirmed: false,
+  config2: '',
+  axles: AXLE_TOPOLOGY_PRESETS.rwd4x2.axles.map(axle => Object.assign({}, axle))
+};
+
+function normalizeAxleTopologyState(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const axles = Array.isArray(source.axles) ? source.axles : [];
+  return {
+    confirmed: source.confirmed === true,
+    config2: ['FWD', 'RWD', 'AWD'].includes(source.config2) ? source.config2 : '',
+    axles: axles.map((axle, index) => ({
+      module: Math.max(1, Math.min(2, Math.round(Number(axle.module) || 1))),
+      axle: Math.max(1, Math.round(Number(axle.axle) || index + 1)),
+      role: axle.role === 'Front' ? 'Front' : 'Rear',
+      wheels: Math.max(0, Math.round(Number(axle.wheels) || 0)),
+      driven: Math.max(0, Math.round(Number(axle.driven) || 0))
+    }))
+  };
+}
+
+function persistAxleTopology() {
+  const hidden = document.getElementById('axle-topology-data');
+  if(hidden) hidden.value = JSON.stringify(axleTopologyState);
+}
+
+function renderAxleTopologyEditor() {
+  const tbody = document.getElementById('axle-topology-rows');
+  if(!tbody) return;
+  tbody.innerHTML = axleTopologyState.axles.map((axle, index) => (
+    '<tr data-axle-index="' + index + '">' +
+      '<td><select data-axle-field="module" aria-label="Módulo do eixo"><option value="1"' + (axle.module === 1 ? ' selected' : '') + '>Wheels</option><option value="2"' + (axle.module === 2 ? ' selected' : '') + '>Wheels2</option></select></td>' +
+      '<td><input type="number" data-axle-field="axle" value="' + axle.axle + '" min="1" step="1" aria-label="Número do eixo"></td>' +
+      '<td><select data-axle-field="role" aria-label="Função do eixo"><option value="Front"' + (axle.role === 'Front' ? ' selected' : '') + '>Dianteiro</option><option value="Rear"' + (axle.role === 'Rear' ? ' selected' : '') + '>Traseiro</option></select></td>' +
+      '<td><input type="number" data-axle-field="wheels" value="' + axle.wheels + '" min="1" max="12" step="1" aria-label="Rodas totais no eixo"></td>' +
+      '<td><input type="number" data-axle-field="driven" value="' + axle.driven + '" min="0" max="12" step="1" aria-label="Rodas motrizes no eixo"></td>' +
+      '<td><button class="topology-remove" type="button" data-remove-axle="' + index + '" aria-label="Remover eixo">×</button></td>' +
+    '</tr>'
+  )).join('');
+  const config2 = document.getElementById('axle-config2');
+  if(config2) config2.value = axleTopologyState.config2;
+  persistAxleTopology();
+  updateAxleTopologyStateBadge();
+}
+
+function updateAxleTopologyFromEditor() {
+  const tbody = document.getElementById('axle-topology-rows');
+  if(!tbody) return;
+  axleTopologyState.axles = Array.from(tbody.querySelectorAll('tr')).map(row => {
+    const read = field => row.querySelector('[data-axle-field="' + field + '"]');
+    return {
+      module: parseInt(read('module').value, 10) || 1,
+      axle: parseInt(read('axle').value, 10) || 1,
+      role: read('role').value === 'Front' ? 'Front' : 'Rear',
+      wheels: Math.max(0, parseInt(read('wheels').value, 10) || 0),
+      driven: Math.max(0, parseInt(read('driven').value, 10) || 0)
+    };
+  });
+  axleTopologyState.config2 = s('axle-config2');
+  axleTopologyState.confirmed = false;
+  persistAxleTopology();
+  updateAxleTopologyStateBadge();
+  calcAxleTopology();
+}
+
+function updateAxleTopologyStateBadge(kind, message) {
+  const badge = document.getElementById('axle-topology-state');
+  const messageEl = document.getElementById('axle-topology-message');
+  const prompt = document.getElementById('topology-prompt');
+  if(prompt) prompt.hidden = axleTopologyState.confirmed;
+  if(!badge) return;
+  if(kind === 'invalid') {
+    badge.textContent = 'Revisar';
+    badge.className = 'topology-state invalid';
+  } else if(axleTopologyState.confirmed) {
+    badge.textContent = 'Confirmada';
+    badge.className = 'topology-state confirmed';
+  } else {
+    badge.textContent = 'Pendente';
+    badge.className = 'topology-state pending';
+  }
+  if(messageEl && message) messageEl.textContent = message;
+  else if(messageEl && !axleTopologyState.confirmed) messageEl.textContent = 'Confirme para liberar o cálculo por eixo.';
+}
+
+function applyAxlePreset(name) {
+  const preset = AXLE_TOPOLOGY_PRESETS[name] || AXLE_TOPOLOGY_PRESETS.rwd4x2;
+  const config = document.getElementById('diffconfig');
+  if(config) config.value = preset.config;
+  axleTopologyState = normalizeAxleTopologyState({
+    confirmed: false,
+    config2: preset.config2,
+    axles: preset.axles
+  });
+  renderAxleTopologyEditor();
+  calcCore();
+}
+
+function loadAxleTopologyFromHidden() {
+  const hidden = document.getElementById('axle-topology-data');
+  if(!hidden || !hidden.value) {
+    renderAxleTopologyEditor();
+    return;
+  }
+  try {
+    axleTopologyState = normalizeAxleTopologyState(JSON.parse(hidden.value));
+  } catch(_error) {
+    axleTopologyState = normalizeAxleTopologyState({ axles: AXLE_TOPOLOGY_PRESETS.rwd4x2.axles });
+  }
+  renderAxleTopologyEditor();
+}
+
+function formatAc6Value(value) {
+  return Math.round(Math.max(0, value)).toLocaleString('pt-BR');
+}
+
+function clearAxleResults(message) {
+  document.getElementById('axle-driven-count').textContent = '—';
+  document.getElementById('axle-total-torque').textContent = '—';
+  document.getElementById('axle-total-brake').textContent = '—';
+  const tbody = document.querySelector('#axle-results-table tbody');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="7" class="empty-table">' + message + '</td></tr>';
+}
+
+function getAxleDistribution() {
+  const dyno = window._ac6Result;
+  const transmissionTorque = dyno && dyno.peakWheelTorque ? dyno.peakWheelTorque.wheelTorque : 0;
+  return AC6Math.distributeByAxles({
+    transmissionTorque,
+    torqueVector: v('torquevector'),
+    brakeForce: v('bk-force'),
+    brakeBias: v('bk-bias') / 100,
+    config1: s('diffconfig') || 'RWD',
+    config2: axleTopologyState.config2 || null,
+    physicsFPS: 60,
+    throttle: 1,
+    tcsMultiplier: 1,
+    clutchMultiplier: 1,
+    engineOn: 1,
+    axles: axleTopologyState.axles
+  });
+}
+
+function calcAxleTopology() {
+  if(!document.getElementById('axle-results-table')) return;
+  const distribution = getAxleDistribution();
+  if(!axleTopologyState.confirmed) {
+    clearAxleResults('Confirme a topologia acima para calcular.');
+    return;
+  }
+  if(!distribution.valid) {
+    axleTopologyState.confirmed = false;
+    persistAxleTopology();
+    updateAxleTopologyStateBadge('invalid', distribution.warnings.join(' '));
+    clearAxleResults('Corrija a topologia informada.');
+    return;
+  }
+
+  document.getElementById('axle-driven-count').textContent = distribution.totalDrivenWheels;
+  document.getElementById('axle-total-torque').textContent = formatAc6Value(distribution.totalAppliedTorque);
+  document.getElementById('axle-total-brake').textContent = formatAc6Value(distribution.totalServiceBrake);
+  const tbody = document.querySelector('#axle-results-table tbody');
+  tbody.innerHTML = distribution.rows.map(row => (
+    '<tr>' +
+      '<td>M' + row.module + ' · eixo ' + row.axle + ' · ' + (row.role === 'Front' ? 'F' : 'R') + '</td>' +
+      '<td>' + row.config + '</td>' +
+      '<td class="num">' + row.wheels + ' / ' + row.driven + '</td>' +
+      '<td class="num">' + formatAc6Value(row.axleTorque) + '</td>' +
+      '<td class="num">' + (row.driven ? formatAc6Value(row.torquePerDrivenWheel) : '—') + '</td>' +
+      '<td class="num">' + formatAc6Value(row.axleBrake) + '</td>' +
+      '<td class="num">' + formatAc6Value(row.brakePerWheel) + '</td>' +
+    '</tr>'
+  )).join('');
+
+  const dyno = window._ac6Result;
+  const peak = dyno && dyno.peakWheelTorque ? dyno.peakWheelTorque : null;
+  const gearIndex = dyno && dyno.config ? dyno.config.gearIndex : 0;
+  updateAxleTopologyStateBadge(null, 'Calculado no pico de torque pós-relação: ' +
+    (peak ? formatAc6Value(peak.wheelTorque) + ' @ ' + Math.round(peak.rpm) + ' RPM' : '—') +
+    ' · ' + (gearIndex + 1) + 'ª marcha.');
+}
+
+function confirmAxleTopology() {
+  updateAxleTopologyFromEditor();
+  const distribution = getAxleDistribution();
+  if(!distribution.valid) {
+    updateAxleTopologyStateBadge('invalid', distribution.warnings.join(' '));
+    showToast('Revise a topologia dos eixos.', 'error');
+    return;
+  }
+  axleTopologyState.confirmed = true;
+  persistAxleTopology();
+  updateAxleTopologyStateBadge();
+  calcAxleTopology();
+  showToast('Topologia confirmada e cálculo por eixo liberado.', 'success');
+}
+
+function bindAxleTopologyEditor() {
+  const tbody = document.getElementById('axle-topology-rows');
+  if(!tbody) return;
+  tbody.addEventListener('input', updateAxleTopologyFromEditor);
+  tbody.addEventListener('change', updateAxleTopologyFromEditor);
+  tbody.addEventListener('click', event => {
+    const button = event.target.closest('[data-remove-axle]');
+    if(!button) return;
+    axleTopologyState.axles.splice(parseInt(button.dataset.removeAxle, 10), 1);
+    axleTopologyState.confirmed = false;
+    renderAxleTopologyEditor();
+    calcAxleTopology();
+  });
+  document.getElementById('axle-config2').addEventListener('change', updateAxleTopologyFromEditor);
+  document.getElementById('axle-apply-preset').addEventListener('click', () => applyAxlePreset(s('axle-preset')));
+  document.getElementById('axle-add-row').addEventListener('click', () => {
+    const moduleId = axleTopologyState.axles.some(axle => axle.module === 2) ? 2 : 1;
+    const nextAxle = axleTopologyState.axles
+      .filter(axle => axle.module === moduleId)
+      .reduce((max, axle) => Math.max(max, axle.axle), 0) + 1;
+    axleTopologyState.axles.push({ module: moduleId, axle: nextAxle, role: 'Rear', wheels: 2, driven: 0 });
+    axleTopologyState.confirmed = false;
+    renderAxleTopologyEditor();
+    calcAxleTopology();
+  });
+  document.getElementById('axle-confirm').addEventListener('click', confirmAxleTopology);
+  document.getElementById('topology-open').addEventListener('click', () => {
+    const nav = document.querySelector('.nav-item[data-tab="drivetrain"]');
+    if(nav) nav.click();
+    setTimeout(() => document.querySelector('.axle-topology-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  });
+  loadAxleTopologyFromHidden();
+}
 function calcBrakes() {
   let bf=v('bk-force'), bias=v('bk-bias')/100, wt=v('weight'), mu=v('bk-mu');
   let spdInput = v('bk-speed');
@@ -556,54 +951,51 @@ function calcSteering() {
 }
 
 function calcElec() {
-  let en = chk('elec-en'), eHp = v('e-hp'), eTq = v('e-tq'), eRl = v('e-redline');
-  document.getElementById('elec-hp').textContent = en ? eHp : '—';
-  document.getElementById('elec-tq').textContent = en ? eTq : '—';
-  document.getElementById('elec-rl').textContent = en ? eRl.toLocaleString() : '—';
-  
-  let combEl = document.getElementById('elec-combined');
-  let modeEl = document.getElementById('elec-mode');
-  let eng = chk('engine-en');
-  
-  if(en && eng) {
-    let hp=v('hp'), cr=v('cr'), tEn=chk('turbo-en'), tc=tEn?v('tcount'):0, tb=tEn?v('tboost'):0;
-    let sEn=chk('super-en'), sc=sEn?v('scount'):0, sb=sEn?v('sboost'):0;
-    let HT=((hp*tb*tc*(cr/10)/7.5)/2), HS=((hp*sb*sc*(cr/10)/7.5)/2);
-    combEl.textContent = Math.round(hp+HT+HS+eHp)+' HP';
-    modeEl.textContent = 'Híbrido';
-  } else if(en) {
-    combEl.textContent = eHp+' HP (só elétrico)';
-    modeEl.textContent = 'Só elétrico';
-  } else if(eng) {
-    combEl.textContent = '—';
-    modeEl.textContent = 'Só combustão';
+  const enabled = chk('elec-en');
+  const engine = chk('engine-en');
+  const dyno = window._ac6Result;
+  const electricPeak = dyno && dyno.peakElectric ? dyno.peakElectric.electricHP : 0;
+  const combinedPeak = dyno && dyno.peakTotal ? dyno.peakTotal.totalHP : 0;
+  const electricTorquePeak = dyno
+    ? dyno.samples.reduce((best, sample) => Math.max(best, sample.electricTorque), 0)
+    : 0;
+
+  document.getElementById('elec-hp').textContent = enabled ? Math.round(electricPeak) : '—';
+  document.getElementById('elec-tq').textContent = enabled ? Math.round(electricTorquePeak) : '—';
+  document.getElementById('elec-rl').textContent = enabled ? v('e-redline').toLocaleString('pt-BR') : '—';
+
+  const combined = document.getElementById('elec-combined');
+  const mode = document.getElementById('elec-mode');
+  if(enabled && engine) {
+    combined.textContent = Math.round(combinedPeak) + ' HP';
+    mode.textContent = 'Híbrido';
+  } else if(enabled) {
+    combined.textContent = Math.round(combinedPeak) + ' HP (só elétrico)';
+    mode.textContent = 'Só elétrico';
+  } else if(engine) {
+    combined.textContent = '—';
+    mode.textContent = 'Só combustão';
   } else {
-    combEl.textContent = '—';
-    modeEl.textContent = 'Nenhum ativo';
+    combined.textContent = '—';
+    mode.textContent = 'Nenhum ativo';
   }
 }
 
 function updateBanner() {
-  let hp=v('hp'), cr=v('cr'), tEn=chk('turbo-en'), tc=tEn?v('tcount'):0, tb=tEn?v('tboost'):0;
-  let sEn=chk('super-en'), sc=sEn?v('scount'):0, sb=sEn?v('sboost'):0;
-  let HT=((hp*tb*tc*(cr/10)/7.5)/2), HS=((hp*sb*sc*(cr/10)/7.5)/2);
-  let eEn=chk('elec-en'), eHp=eEn?v('e-hp'):0;
-  let total=Math.round(hp+HT+HS+eHp);
-  let wt=v('weight'), wKg=Math.round(wt/2.205);
-  let cfg=s('diffconfig')||'RWD';
-  let fd=v('dt-finaldrive')*v('dt-fdmult'), wDia=v('dt-wdia-x'), redline=v('redline');
-  let rats=document.getElementById('dt-ratios').value.split(',').map(x=>parseFloat(x.trim())).filter(n=>!isNaN(n)&&n>0);
-  let lastR=rats.length?rats[rats.length-1]:1;
-  let SCALE=(10/12)*(60/88);
-  let wheelRadS=(redline/(lastR*fd))*2*Math.PI/60;
-  let topMph=wheelRadS*(wDia/2)*SCALE;
-  let topSpd=USE_KMH?topMph*1.60934:topMph;
-  
-  document.getElementById('bn-hp').textContent=total+' HP';
-  document.getElementById('bn-wt').textContent=wKg.toLocaleString()+' kg';
-  document.getElementById('bn-cfg').textContent=cfg;
-  document.getElementById('bn-top').textContent=topSpd.toFixed(0)+' '+spdLabel();
-  document.getElementById('bn-elec').textContent=eEn?'Híbrido':'Combustão';
+  const dyno = window._ac6Result;
+  const total = dyno && dyno.peakTotal ? Math.round(dyno.peakTotal.totalHP) : 0;
+  const wt = v('weight');
+  const wKg = Math.round(wt / 2.205);
+  const cfg = s('diffconfig') || 'RWD';
+  const gear = getGearSetup();
+  const redline = chk('engine-en') ? v('redline') : v('e-redline');
+  const topMph = AC6Math.speedMphFromRedline(redline, gear.lastRatio, gear.fd, gear.fdMult, gear.wheelDiameter);
+
+  document.getElementById('bn-hp').textContent = total + ' HP';
+  document.getElementById('bn-wt').textContent = wKg.toLocaleString('pt-BR') + ' kg';
+  document.getElementById('bn-cfg').textContent = cfg;
+  document.getElementById('bn-top').textContent = spd(topMph).toFixed(0) + ' ' + spdLabel();
+  document.getElementById('bn-elec').textContent = chk('elec-en') ? (chk('engine-en') ? 'Híbrido' : 'Elétrico') : (chk('engine-en') ? 'Combustão' : 'OFF');
 }
 
 function updateGearIndicator() {
@@ -622,7 +1014,7 @@ function updateGearIndicator() {
 function calcCore(){
   calcHP(); calcPW(); calcClutch(); calcDiff(); calcSus(); 
   calcDrivetrain(); calcBrakes(); calcSteering(); calcElec();
-  updateBanner(); updateGearIndicator(); refreshUnitLabels();
+  updateBanner(); updateGearIndicator(); calcAxleTopology(); refreshUnitLabels();
 }
 const calc = debounce(calcCore, 100);
 
@@ -633,6 +1025,7 @@ document.querySelectorAll('input, select').forEach(el => {
 });
 let fitTorqueValuesBtn = document.getElementById('fit-torque-values-btn');
 if(fitTorqueValuesBtn) fitTorqueValuesBtn.addEventListener('click', fitTuneValuesToAutoDyno);
+bindAxleTopologyEditor();
 calcCore();
 
 /* Toggle Pills */
@@ -895,8 +1288,13 @@ function collectTuneValues() {
     if(vals[k] !== undefined) return;
     if(el.dataset.tuneBool !== undefined) vals[k] = el.checked;
     else if(el.dataset.tuneStr !== undefined) vals[k] = el.value;
-    else vals[k] = parseFloat(el.value) || 0;
+    else {
+      const scale = parseFloat(el.dataset.tuneScale) || 1;
+      vals[k] = (parseFloat(el.value) || 0) * scale;
+    }
   });
+  if(!chk('turbo-en')) vals.Turbochargers = 0;
+  if(!chk('super-en')) vals.Superchargers = 0;
   return vals;
 }
 
@@ -941,6 +1339,18 @@ function buildLua() {
   return buildByIsaacsa2Lua();
 }
 
+function applyAxleTopologyToTune(source) {
+  if(!axleTopologyState.confirmed) return source;
+  const hasModule2 = axleTopologyState.axles.some(axle => axle.module === 2);
+  if(!hasModule2 || !axleTopologyState.config2) return source;
+  if(/^[\t ]*Tune\.Config2[\t ]*=/m.test(source)) {
+    return replaceTuneLine(source, 'Config2', axleTopologyState.config2);
+  }
+  return source.replace(
+    /(^[\t ]*Tune\.Config[\t ]*=[^\r\n]*(?:\r?\n|$))/m,
+    '$1Tune.Config2\t\t\t= "' + axleTopologyState.config2 + '"\n'
+  );
+}
 function buildByIsaacsa2Lua() {
   let source = chassisTemplateSource || '';
   if(!source) return buildLuaIsaacsa2();
@@ -953,17 +1363,17 @@ function buildByIsaacsa2Lua() {
 
   source = source.replace(/Tune\.Ratios\s*=\s*\{[\s\S]*?\n\}/, buildRatiosBlock());
   source = replaceControlsBlock(source);
-  return source;
+  return applyAxleTopologyToTune(source);
 }
 
 function buildLuaIsaacsa2() {
-  let vals={};
-  document.querySelectorAll('[data-tune]').forEach(el => {
-    let k = el.dataset.tune;
-    if(vals[k]!==undefined) return;
-    if(el.dataset.tuneBool!==undefined) vals[k] = el.checked ? 'true' : 'false';
-    else if(el.dataset.tuneStr!==undefined) vals[k] = '"'+el.value+'"';
-    else vals[k] = luaN(parseFloat(el.value)||0);
+  const rawVals = collectTuneValues();
+  let vals = {};
+  Object.keys(rawVals).forEach(key => {
+    const value = rawVals[key];
+    if(typeof value === 'boolean') vals[key] = value ? 'true' : 'false';
+    else if(typeof value === 'string') vals[key] = '"' + value + '"';
+    else vals[key] = luaN(value);
   });
   function L(key, comment){
     let v2 = vals[key]; if(v2===undefined) return '';
@@ -996,9 +1406,9 @@ function buildLuaIsaacsa2() {
   t+='--[[Steering]]\n'+L('SteeringType')+'-- New Options\n'+L('SteerRatio')+L('LockToLock')+L('Ackerman')+'\n-- Old Options\nTune.SteerInner\t\t\t= 60\nTune.SteerOuter\t\t\t= 60\n\n-- General Steering\n'+L('SteerSpeed')+L('ReturnSpeed')+L('SteerDecay')+L('MinSteer')+'Tune.MSteerExp\t\t\t= 1\n\n-- Steer Gyro\nTune.SteerD\t\t\t\t= 1000\nTune.SteerMaxTorque\t\t= 45000\nTune.SteerP\t\t\t\t= 100000\n\n';
   t+='--Four Wheel Steering (LuaInt)\n'+L('FWSteer')+L('RSteerOuter')+L('RSteerInner')+L('RSteerSpeed')+L('RSteerDecay')+'Tune.RSteerD\t\t\t= 1000\nTune.RSteerMaxTorque\t= 50000\nTune.RSteerP\t\t\t= 100000\n\n';
   
-  t+='--[[Engine]]\n'+L('Engine')+L('Horsepower')+L('IdleRPM')+L('PeakRPM')+L('Redline')+L('PeakSharpness')+L('CurveMult')+'Tune.EqPoint\t\t\t= 5252\n\n'+L('CompressionRatio')+'\n';
+  t+='--[[Engine]]\n'+L('Engine')+L('Horsepower')+L('IdleRPM')+L('PeakRPM')+L('Redline')+L('PeakSharpness')+L('CurveMult')+L('EqPoint')+'\n'+L('CompressionRatio')+'\n';
   t+='-- Electric Engine\n'+L('Electric')+L('E_Redline')+L('E_Trans1')+L('E_Trans2')+'-- Horsepower\n'+L('E_Horsepower')+L('EH_FrontMult')+L('EH_EndMult')+L('EH_EndPercent')+'-- Torque\n'+L('E_Torque')+L('ET_EndMult')+L('ET_EndPercent')+'\n';
-  t+='-- Turbocharger\n'+L('Turbochargers')+L('T_Boost')+L('T_BoostLag')+'Tune.T2_BoostLag\t\t= '+luaN(v('tlag'))+'\n\n';
+  t+='-- Turbocharger\n'+L('Turbochargers')+L('T_Boost')+L('T_BoostLag')+L('T2_BoostLag')+'\n';
   t+='-- Supercharger\n'+L('Superchargers')+L('S_Boost')+L('S_Sensitivity')+'\n--Misc\n'+L('ThrotAccel')+L('ThrotDecel')+'\nTune.BrakeAccel\t\t\t= '+luaN(v('brakeaccel'))+'\nTune.BrakeDecel\t\t\t= '+luaN(v('brakedecel'))+'\n\n'+L('RevAccel')+L('RevDecay')+L('RevBounce')+'\n'+L('IdleThrottle')+L('Flywheel')+'\n'+L('InclineComp')+'\n';
   
   t+='--[[Drivetrain]]\n'+L('Config')+L('TorqueVector')+'\n-- Differential Settings\n'+L('DifferentialType')+'\n-- Old Options\n'+L('FDiffSlipThres')+L('FDiffLockThres')+L('RDiffSlipThres')+L('RDiffLockThres')+L('CDiffSlipThres')+L('CDiffLockThres')+'\n-- New Options\n'+L('FDiffPower')+L('FDiffCoast')+L('FDiffPreload')+L('RDiffPower')+L('RDiffCoast')+L('RDiffPreload')+'\n-- Traction Control\n'+L('TCSEnabled')+L('TCSThreshold')+'Tune.TCSGradient\t\t= 10\n'+L('TCSLimit')+'\n';
@@ -1009,7 +1419,7 @@ function buildLuaIsaacsa2() {
   t+='--[[Brakes]]\n'+L('ABSEnabled')+L('ABSThreshold')+'\n'+L('BrakeForce')+L('BrakeBias')+L('PBrakeForce')+L('PBrakeBias')+L('EBrakeForce')+'\n';
   
   t+='--[[Default Controls]]\nTune.Peripherals = {\n\tMSteerWidth\t\t\t\t= 67,\n\tMSteerDZone\t\t\t\t= 10,\n\tControlLDZone\t\t\t= 5,\n\tControlRDZone\t\t\t= 5,\n}\n\nTune.Controls = {\n\tToggleTCS\t\t\t\t= Enum.KeyCode.T,\n\tToggleABS\t\t\t\t= Enum.KeyCode.Y,\n\tToggleTransMode\t\t\t= Enum.KeyCode.LeftAlt,\n\tToggleMouseDrive\t\t= Enum.KeyCode.Insert,\n\tThrottle\t\t\t\t= Enum.KeyCode.Up,\n\tBrake\t\t\t\t\t= Enum.KeyCode.Down,\n\tSteerLeft\t\t\t\t= Enum.KeyCode.Left,\n\tSteerRight\t\t\t\t= Enum.KeyCode.Right,\n\tThrottle2\t\t\t\t= Enum.KeyCode.W,\n\tBrake2\t\t\t\t\t= Enum.KeyCode.S,\n\tSteerLeft2\t\t\t\t= Enum.KeyCode.A,\n\tSteerRight2\t\t\t\t= Enum.KeyCode.D,\n\tShiftUp\t\t\t\t\t= Enum.KeyCode.E,\n\tShiftDown\t\t\t\t= Enum.KeyCode.Q,\n\tClutch\t\t\t\t\t= Enum.KeyCode.LeftShift,\n\tPBrake\t\t\t\t\t= Enum.KeyCode.Asterisk,\n\tMouseThrottle\t\t\t= Enum.UserInputType.MouseButton1,\n\tMouseBrake\t\t\t\t= Enum.UserInputType.MouseButton2,\n\tMouseClutch\t\t\t\t= Enum.KeyCode.W,\n\tMouseShiftUp\t\t\t= Enum.KeyCode.E,\n\tMouseShiftDown\t\t\t= Enum.KeyCode.Q,\n\tMousePBrake\t\t\t\t= Enum.KeyCode.LeftShift,\n\tContlrThrottle\t\t\t= Enum.KeyCode.ButtonR2,\n\tContlrBrake\t\t\t\t= Enum.KeyCode.ButtonL2,\n\tContlrSteer\t\t\t\t= Enum.KeyCode.Thumbstick1,\n\tContlrShiftUp\t\t\t= Enum.KeyCode.ButtonY,\n\tContlrShiftDown\t\t\t= Enum.KeyCode.ButtonX,\n\tContlrClutch\t\t\t= Enum.KeyCode.ButtonR1,\n\tContlrPBrake\t\t\t= Enum.KeyCode.ButtonL1,\n\tContlrToggleTMode\t\t= Enum.KeyCode.DPadUp,\n\tContlrToggleTCS\t\t\t= Enum.KeyCode.DPadDown,\n\tContlrToggleABS\t\t\t= Enum.KeyCode.DPadRight,\n}\n\nreturn Tune\n';
-  return replaceControlsBlock(t);
+  return applyAxleTopologyToTune(replaceControlsBlock(t));
 }
 
 const expBack = document.getElementById('export-modal-backdrop');
@@ -1079,7 +1489,7 @@ document.getElementById('import-file-input').addEventListener('change', e => {
   r.readAsText(f); e.target.value = '';
 });
 
-const KM={'Horsepower':'hp','PeakRPM':'peakrpm','Redline':'redline','CompressionRatio':'cr','IdleRPM':'idlerpm','IdleThrottle':'idlethrot','RevAccel':'revaccel','RevDecay':'revdecay','RevBounce':'revbounce','Flywheel':'flywheel','PeakSharpness':'sharp','CurveMult':'curvemult','ThrotAccel':'throtaccel','ThrotDecel':'throtdecel','InclineComp':'inclinecomp','Turbochargers':'tcount','T_Boost':'tboost','T_BoostLag':'tlag','Superchargers':'scount','S_Boost':'sboost','S_Sensitivity':'ssens','ShiftUpTime':'shiftuptime','ShiftDnTime':'shiftdntime','ShiftThrot':'shiftthrot','AutoUpThresh':'autoupthresh','AutoDownThresh':'autodownthresh','ClutchEngage':'clutchengage','ClutchRPMMult':'clutchrpmmult','SpeedEngage':'speedengage','RPMEngage':'rpmengage','KickMult':'kickmult','KickSpeedThreshold':'kickspeed','KickRPMThreshold':'kickrpm','TorqueVector':'torquevector','FDiffPower':'fdiffpower','FDiffCoast':'fdiffcoast','FDiffPreload':'fdiffpreload','FDiffSlipThres':'fdiffslip','FDiffLockThres':'fdifflock','RDiffPower':'rdiffpower','RDiffCoast':'rdiffcoast','RDiffPreload':'rdiffpreload','RDiffSlipThres':'rdiffslip','RDiffLockThres':'rdifflock','CDiffSlipThres':'cdiffslip','CDiffLockThres':'cdifflock','Weight':'weight','WeightDist':'wdist','CGHeight':'cgh','FWheelDensity':'fwd','RWheelDensity':'rwd','AxleDensity':'axd','FSusStiffness':'fstiff','FSusDamping':'fdamp','FSusLength':'flen','FPreCompress':'fprecomp','FExtensionLim':'fext','FCompressLim':'fcomp','RSusStiffness':'rstiff','RSusDamping':'rdamp','RSusLength':'rlen','RPreCompress':'rprecomp','RExtensionLim':'rext','RCompressLim':'rcomp','FinalDrive':'dt-finaldrive','FDMult':'dt-fdmult','BrakeForce':'bk-force','BrakeBias':'bk-bias','PBrakeForce':'bk-pforce','PBrakeBias':'bk-pbias','EBrakeForce':'bk-eforce','BrakeAccel':'brakeaccel','BrakeDecel':'brakedecel','ABSThreshold':'absthreshold','TCSThreshold':'tcsthreshold','TCSLimit':'tcslimit','LockToLock':'st-locktolock','SteerRatio':'st-ratio','Ackerman':'st-ackerman','SteerSpeed':'steerspeed','ReturnSpeed':'returnspeed','SteerDecay':'steerdecay','MinSteer':'minsteer','RSteerOuter':'rsteer-outer','RSteerInner':'rsteer-inner','RSteerSpeed':'rsteer-speed','RSteerDecay':'rsteer-decay','E_Redline':'e-redline','E_Trans1':'e-trans1','E_Trans2':'e-trans2','E_Horsepower':'e-hp','EH_FrontMult':'e-hfrontmult','EH_EndMult':'e-hendmult','EH_EndPercent':'e-hendpct','E_Torque':'e-tq','ET_EndMult':'e-tqendmult','ET_EndPercent':'e-tqendpct','LoadDelay':'loaddelay','NeutralRevRPM':'neutralrevrpm','FCamber':'fcamber','RCamber':'rcamber','FCaster':'fcaster','RCaster':'rcaster','FToe':'ftoe','RToe':'rtoe'};
+const KM={'Horsepower':'hp','PeakRPM':'peakrpm','Redline':'redline','CompressionRatio':'cr','IdleRPM':'idlerpm','IdleThrottle':'idlethrot','RevAccel':'revaccel','RevDecay':'revdecay','RevBounce':'revbounce','Flywheel':'flywheel','PeakSharpness':'sharp','CurveMult':'curvemult','ThrotAccel':'throtaccel','ThrotDecel':'throtdecel','InclineComp':'inclinecomp','EqPoint':'eqpoint','Turbochargers':'tcount','T_Boost':'tboost','T_BoostLag':'tlag','T2_BoostLag':'t2lag','Superchargers':'scount','S_Boost':'sboost','S_Sensitivity':'ssens','ShiftUpTime':'shiftuptime','ShiftDnTime':'shiftdntime','ShiftThrot':'shiftthrot','AutoUpThresh':'autoupthresh','AutoDownThresh':'autodownthresh','ClutchEngage':'clutchengage','ClutchRPMMult':'clutchrpmmult','SpeedEngage':'speedengage','RPMEngage':'rpmengage','KickMult':'kickmult','KickSpeedThreshold':'kickspeed','KickRPMThreshold':'kickrpm','TorqueVector':'torquevector','FDiffPower':'fdiffpower','FDiffCoast':'fdiffcoast','FDiffPreload':'fdiffpreload','FDiffSlipThres':'fdiffslip','FDiffLockThres':'fdifflock','RDiffPower':'rdiffpower','RDiffCoast':'rdiffcoast','RDiffPreload':'rdiffpreload','RDiffSlipThres':'rdiffslip','RDiffLockThres':'rdifflock','CDiffSlipThres':'cdiffslip','CDiffLockThres':'cdifflock','Weight':'weight','WeightDist':'wdist','CGHeight':'cgh','FWheelDensity':'fwd','RWheelDensity':'rwd','AxleDensity':'axd','FSusStiffness':'fstiff','FSusDamping':'fdamp','FSusLength':'flen','FPreCompress':'fprecomp','FExtensionLim':'fext','FCompressLim':'fcomp','RSusStiffness':'rstiff','RSusDamping':'rdamp','RSusLength':'rlen','RPreCompress':'rprecomp','RExtensionLim':'rext','RCompressLim':'rcomp','FinalDrive':'dt-finaldrive','FDMult':'dt-fdmult','BrakeForce':'bk-force','BrakeBias':'bk-bias','PBrakeForce':'bk-pforce','PBrakeBias':'bk-pbias','EBrakeForce':'bk-eforce','BrakeAccel':'brakeaccel','BrakeDecel':'brakedecel','ABSThreshold':'absthreshold','TCSThreshold':'tcsthreshold','TCSLimit':'tcslimit','LockToLock':'st-locktolock','SteerRatio':'st-ratio','Ackerman':'st-ackerman','SteerSpeed':'steerspeed','ReturnSpeed':'returnspeed','SteerDecay':'steerdecay','MinSteer':'minsteer','RSteerOuter':'rsteer-outer','RSteerInner':'rsteer-inner','RSteerSpeed':'rsteer-speed','RSteerDecay':'rsteer-decay','E_Redline':'e-redline','E_Trans1':'e-trans1','E_Trans2':'e-trans2','E_Horsepower':'e-hp','EH_FrontMult':'e-hfrontmult','EH_EndMult':'e-hendmult','EH_EndPercent':'e-hendpct','E_Torque':'e-tq','ET_EndMult':'e-tqendmult','ET_EndPercent':'e-tqendpct','LoadDelay':'loaddelay','NeutralRevRPM':'neutralrevrpm','FCamber':'fcamber','RCamber':'rcamber','FCaster':'fcaster','RCaster':'rcaster','FToe':'ftoe','RToe':'rtoe'};
 const KB={'Engine':'engine-en','ABSEnabled':'abs-en','TCSEnabled':'tcs-en','Clutch':'clutch-en','Stall':'stall-en','ClutchKick':'ck-en','Electric':'elec-en','AutoFlip':'autoflip-en','AutoStart':'autostart-en','NeutralLimit':'neutrallimit-en','LimitClutch':'limitclutch-en'};
 const KS={'AutoShiftType':'autoshifttype','AutoShiftVers':'autoshiftvers','AutoShiftMode':'autoshiftmode','ClutchType':'clutchtype','ClutchMode':'clutchmode','DifferentialType':'difftype','Config':'diffconfig','SteeringType':'steeringtype','FWSteer':'fwsteer'};
 
@@ -1148,10 +1558,28 @@ function applyTuneTextToForm(txt) {
       if(sel){ for(let i=0;i<sel.options.length;i++){ if(sel.options[i].value===sv){ sel.selectedIndex=i; applied++; break; } } }
     } else if(KM[k]){ 
       let num = parseFloat(raw); let nel=document.getElementById(KM[k]); 
-      if(nel && !isNaN(num)){ nel.value=num; applied++; }
+      if(nel && !isNaN(num)){
+        const scale = parseFloat(nel.dataset.tuneScale) || 1;
+        nel.value = num / scale;
+        applied++;
+      }
     }
   });
-  
+
+  [
+    ['tcount', 'turbo-en', 'turbo-pill'],
+    ['scount', 'super-en', 'super-pill']
+  ].forEach(([countId, toggleId, pillId]) => {
+    const enabled = v(countId) > 0;
+    const toggle = document.getElementById(toggleId);
+    const pill = document.getElementById(pillId);
+    if(toggle) toggle.checked = enabled;
+    if(pill) {
+      pill.textContent = enabled ? 'ON' : 'OFF';
+      pill.className = 'pill ' + (enabled ? 'pill-on' : 'pill-off');
+    }
+  });
+
   calc();
   return applied;
 }
@@ -1245,6 +1673,7 @@ function setFormValues(data) {
       else el.value = data[id];
     }
   });
+  loadAxleTopologyFromHidden();
   calcCore();
 }
 
@@ -1319,7 +1748,7 @@ const dict = {
     controlsMouse: 'Mouse',
     controlsGamepad: 'Gamepad',
     weightTraction: 'Peso & Tracao',
-    engineSub: 'Curva de potência · torque no dyno',
+    engineSub: 'Curvas AC6C · potência, torque e marcha no mesmo cálculo do chassis',
     exportStatusIsaac: 'Gera o A-Chassis Tune pronto pro Roblox',
     exportStatusInspare: 'Gera só os campos que existem no AC6 byInspare',
     templateError: 'Não consegui carregar o template byInspare em public/chassis.',
@@ -1361,7 +1790,7 @@ const dict = {
     controlsMouse: 'Mouse',
     controlsGamepad: 'Gamepad',
     weightTraction: 'Weight & Traction',
-    engineSub: 'Power curve · dyno torque',
+    engineSub: 'AC6C curves · power, torque and gearing from the chassis math',
     exportStatusIsaac: 'Generates the A-Chassis Tune ready for Roblox',
     exportStatusInspare: 'Generates only fields that exist in AC6 byInspare',
     templateError: 'Could not load the byInspare template in public/chassis.',
@@ -1417,7 +1846,7 @@ document.querySelectorAll('.formula-card[data-collapsible]').forEach(card => {
 });
 
 /* ─────────── ENGINE SWITCH (Velocidade e UI) ─────────── */
-function spsToSpd(sps){ return USE_KMH ? sps * 1.09728 : sps * 0.681818; }
+function spsToSpd(sps){ return USE_KMH ? sps * (10/12) * 1.09728 : sps * (10/12) * 0.681818; }
 
 function updateSwSpeedLabel() {
   let sps = v('sw-speed');

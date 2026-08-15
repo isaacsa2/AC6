@@ -23,7 +23,7 @@
 <body>
 
 <!-- SIDEBAR -->
-<nav class="sidebar">
+<nav class="sidebar" aria-label="Seções do Tune Maker">
   <div class="rpm-strip"></div>
   <div class="sidebar-logo">
     <span class="brand">AC6C</span>
@@ -62,6 +62,7 @@
 <div class="main">
   <!-- TOP CONTROLS -->
   <div class="top-controls">
+    <span class="version-chip"><span class="version-dot"></span>AC6 atualizado · cálculo fiel</span>
     <button class="btn btn-ghost" id="lang-btn">🇺🇸 EN-US</button>
     <button class="btn btn-outline" id="save-local-btn" data-i18n="save">💾 Salvar Local</button>
     <button class="btn btn-outline" id="load-local-btn" data-i18n="load">📂 Carregar</button>
@@ -80,17 +81,36 @@
     <div class="banner-item">⚡ <span class="banner-val" id="bn-elec">—</span></div>
   </div>
 
+  <div id="topology-prompt" class="topology-prompt" role="status">
+    <div><strong>Antes do torque por eixo:</strong><span> informe manualmente quantos eixos, rodas e rodas motrizes o modelo possui.</span></div>
+    <button class="btn btn-amber" id="topology-open" type="button">Configurar eixos</button>
+  </div>
+
   <div class="main-inner">
 
     <!-- ══ MOTOR ══ -->
     <div class="tab-panel active" data-panel="engine">
-      <div class="page-head"><div><h1 data-i18n="engine">Motor</h1><p data-i18n="engineSub">Curva de potência · torque no dyno</p></div></div>
+      <div class="page-head"><div><h1 data-i18n="engine">Motor</h1><p data-i18n="engineSub">Curvas AC6C · potência, torque e marcha no mesmo cálculo do chassis</p></div><span class="data-quality exact">Fiel ao Build 6C</span></div>
+
+      <div class="precision-bar">
+        <div class="precision-copy">
+          <span class="eyebrow">Cenário do dyno</span>
+          <strong id="dyno-mode-title">Boost estabilizado</strong>
+          <p id="dyno-mode-help">Curvas de cache do AC6 com turbo pleno e resposta do supercharger em carga total.</p>
+        </div>
+        <div class="precision-controls">
+          <div class="field"><label>Leitura</label><select id="dyno-mode"><option value="settled">Estabilizado</option><option value="transient">Resposta temporal</option></select></div>
+          <div class="field"><label>Acelerador (%)</label><input type="number" id="dyno-throttle" value="100" min="0" max="100" step="1"></div>
+          <div class="field"><label>Após (s)</label><input type="number" id="dyno-duration" value="2" min="0" max="30" step="0.1"></div>
+          <div class="field"><label>Marcha</label><select id="dyno-gear"><option value="0">1ª</option></select></div>
+        </div>
+      </div>
 
       <div class="results-row" style="margin-bottom: 1rem;">
         <div class="metric metric-amber"><p class="lbl">HP Pico</p><p class="val" id="r-na">—</p><p class="sub">NA</p></div>
         <div class="metric metric-blue"><p class="lbl">HP Turbo</p><p class="val" id="r-turbo">—</p><p class="sub" id="r-turbo-sub">—</p></div>
         <div class="metric"><p class="lbl">HP Super</p><p class="val" id="r-super">—</p><p class="sub" id="r-super-sub">—</p></div>
-        <div class="metric metric-green"><p class="lbl">HP Total</p><p class="val" id="r-total" style="font-size:1.6rem">—</p><p class="sub">boost pleno</p></div>
+        <div class="metric metric-green"><p class="lbl">HP Total pico</p><p class="val" id="r-total" style="font-size:1.6rem">—</p><p class="sub" id="r-total-sub">—</p></div>
       </div>
 
       <div class="grid2" style="margin-bottom:.75rem;">
@@ -108,6 +128,7 @@
             <div class="field"><label>Flywheel <span class="help-icon" data-tooltip="Inércia. Mais alto = RPM estável, mas sobe mais devagar">(?)</span></label><input type="number" data-tune="Flywheel" id="flywheel" value="300"></div>
             <div class="field"><label>PeakSharpness</label><input type="number" data-tune="PeakSharpness" id="sharp" value="6.5" step="0.1"></div>
             <div class="field"><label>CurveMult</label><input type="number" data-tune="CurveMult" id="curvemult" value="0.2" step="0.01"></div>
+            <div class="field"><label>EqPoint <span class="help-icon" data-tooltip="Constante usada pelo AC6 para converter HP em torque">(?)</span></label><input type="number" data-tune="EqPoint" id="eqpoint" value="5252"></div>
             <div class="field"><label>ThrotAccel</label><input type="number" data-tune="ThrotAccel" id="throtaccel" value="0.025" step="0.001"></div>
             <div class="field"><label>ThrotDecel</label><input type="number" data-tune="ThrotDecel" id="throtdecel" value="0.15" step="0.001"></div>
             <div class="field"><label>InclineComp</label><input type="number" data-tune="InclineComp" id="inclinecomp" value="1" step="0.1"></div>
@@ -128,6 +149,7 @@
               <div class="field"><label>Turbochargers</label><input type="number" data-tune="Turbochargers" id="tcount" value="1"></div>
               <div class="field"><label>T_Boost (PSI)</label><input type="number" data-tune="T_Boost" id="tboost" value="6"></div>
               <div class="field"><label>T_BoostLag</label><input type="number" data-tune="T_BoostLag" id="tlag" value="6"></div>
+              <div class="field"><label>T2_BoostLag</label><input type="number" data-tune="T2_BoostLag" id="t2lag" value="6"></div>
             </div>
           </div>
           <div class="card">
@@ -143,10 +165,10 @@
             </div>
           </div>
           <div class="card">
-            <p class="card-title">Suavização de Torque</p>
+            <p class="card-title">Ajuste assistido <span class="data-quality estimate">experimental</span></p>
             <div class="toggle-row">
-              <label class="toggle-label"><label class="switch"><input type="checkbox" id="torque-smooth-en" checked><span class="slider-sw"></span></label>Modo automático realista</label>
-              <span class="pill pill-on" id="torque-smooth-pill">ON</span>
+              <label class="toggle-label"><label class="switch"><input type="checkbox" id="torque-smooth-en"><span class="slider-sw"></span></label>Suavizar só a prévia</label>
+              <span class="pill pill-off" id="torque-smooth-pill">OFF</span>
             </div>
             <div class="field-group" style="margin:.75rem 0">
               <div class="field"><label>Perfil</label><select id="torque-fit-profile"><option value="balanced">Equilibrado</option><option value="smooth">Mais suave</option><option value="responsive">Mais resposta</option></select></div>
@@ -158,23 +180,30 @@
             </div>
             <button class="btn btn-outline" id="fit-torque-values-btn" type="button">Aplicar nos valores AC6</button>
             <p class="field-note" id="fit-torque-values-status"></p>
-            <p class="field-note">Ajusta PeakSharpness/CurveMult para suavizar torque sem deformar HP. Opcionalmente recalcula o FinalDrive para bater a velocidade alvo.</p>
+            <p class="field-note">A suavização altera apenas o gráfico. O botão pode alterar PeakSharpness, CurveMult e FinalDrive; use como sugestão, não como leitura exata.</p>
           </div>
         </div>
       </div>
 
       <div class="chart-card">
         <div class="chart-header">
-          <p class="card-title" style="margin:0">Curva de Potência e Torque</p>
+          <div><p class="card-title" style="margin:0">Curva de Potência e Torque</p><p class="chart-caption" id="chart-caption">Amostras de 100 RPM, como o cache do AC6.</p></div>
           <div class="legend">
             <div class="legend-item"><div class="legend-dot" style="background:#39e58c"></div>HP Total</div>
             <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Torque (lbf.ft)</div>
           </div>
         </div>
-        <div class="chart-wrap"><canvas id="hpChart"></canvas></div>
+        <div class="chart-wrap"><canvas id="hpChart" role="img" aria-label="Gráfico de potência e torque por RPM"></canvas></div>
       </div>
 
-      <div class="section-label">Potência vs Peso</div>
+      <div class="results-row exact-results">
+        <div class="metric metric-green"><p class="lbl">Pico combinado</p><p class="val" id="r-peak-rpm">—</p><p class="sub">RPM</p></div>
+        <div class="metric metric-amber"><p class="lbl">Torque no motor</p><p class="val" id="r-engine-torque">—</p><p class="sub">lbf.ft · pico</p></div>
+        <div class="metric metric-blue"><p class="lbl">Torque pós-relação</p><p class="val" id="r-wheel-torque">—</p><p class="sub" id="r-wheel-torque-sub">antes do rateio por eixo</p></div>
+        <div class="metric"><p class="lbl">Velocidade no corte</p><p class="val" id="r-gear-speed">—</p><p class="sub" id="r-gear-speed-sub">—</p></div>
+      </div>
+
+      <div class="section-label">Potência vs Peso <span class="data-quality estimate">estimativa física</span></div>
       <div class="results-row" style="grid-template-columns:repeat(3,1fr)">
         <div class="metric metric-amber"><p class="lbl">HP/Tonelada</p><p class="val" id="pw-hppt">—</p><p class="sub">métrico</p></div>
         <div class="metric metric-green"><p class="lbl" id="lbl-060">0–100 km/h est.</p><p class="val" id="pw-060">—</p><p class="sub">estimativa</p></div>
@@ -405,6 +434,74 @@
         <div class="metric metric-green"><p class="lbl">Vel. máx total</p><p class="val" id="dt-top-spd">—</p><p class="sub" id="dt-top-sub"></p></div>
         <div class="metric metric-amber"><p class="lbl">Spread marchas</p><p class="val" id="dt-spread">—</p><p class="sub">1ª ÷ última</p></div>
       </div>
+
+      <div class="section-label">Topologia manual <span class="data-quality exact">rateio do Drive</span></div>
+      <div class="card axle-topology-card">
+        <div class="topology-head">
+          <div>
+            <p class="card-title">Módulos, eixos e rodas</p>
+            <p class="topology-intro">Confirme como o veículo foi montado no Studio. <code>WheelDriven</code> tem prioridade sobre Config, então o Tune sozinho não informa essa topologia.</p>
+          </div>
+          <span class="topology-state pending" id="axle-topology-state">Pendente</span>
+        </div>
+
+        <div class="topology-toolbar">
+          <div class="field">
+            <label>Começar por um preset</label>
+            <select id="axle-preset">
+              <option value="rwd4x2">4×2 traseiro</option>
+              <option value="fwd4x2">4×2 dianteiro</option>
+              <option value="awd4x4">4×4 / AWD</option>
+              <option value="truck6x2">6×2 trucado</option>
+              <option value="truck6x4">6×4 trucado</option>
+              <option value="articulated">Articulado com Wheels2</option>
+            </select>
+          </div>
+          <button class="btn btn-outline" id="axle-apply-preset" type="button">Aplicar preset</button>
+          <div class="field">
+            <label>Config2 (Wheels2)</label>
+            <select id="axle-config2">
+              <option value="">Herdar Config</option>
+              <option value="FWD">FWD</option>
+              <option value="RWD">RWD</option>
+              <option value="AWD">AWD</option>
+            </select>
+          </div>
+        </div>
+
+        <input type="hidden" id="axle-topology-data" value="">
+        <div class="table-scroll">
+          <table class="table-mini topology-editor-table">
+            <thead><tr><th>Módulo</th><th>Eixo</th><th>Função</th><th>Rodas</th><th>Motrizes</th><th></th></tr></thead>
+            <tbody id="axle-topology-rows"></tbody>
+          </table>
+        </div>
+        <div class="topology-actions">
+          <button class="btn btn-ghost" id="axle-add-row" type="button">+ Adicionar eixo</button>
+          <button class="btn btn-amber" id="axle-confirm" type="button">Confirmar topologia</button>
+          <span class="field-note" id="axle-topology-message">Confirme para liberar o cálculo por eixo.</span>
+        </div>
+      </div>
+
+      <div class="results-row axle-summary">
+        <div class="metric metric-blue"><p class="lbl">Rodas motrizes</p><p class="val" id="axle-driven-count">—</p><p class="sub">WheelDriven = true</p></div>
+        <div class="metric metric-green"><p class="lbl">Torque aplicado total</p><p class="val" id="axle-total-torque">—</p><p class="sub">soma dos eixos</p></div>
+        <div class="metric metric-purple"><p class="lbl">Freio de serviço total</p><p class="val" id="axle-total-brake">—</p><p class="sub">100% de pedal</p></div>
+      </div>
+
+      <div class="card axle-results-card">
+        <div class="chart-header">
+          <div><p class="card-title" style="margin:0">Resultado por eixo</p><p class="chart-caption">Base exata do Drive: 60 FPS, acelerador 100%, embreagem acoplada, TCS/limitadores inativos e diferencial em multiplicador 1.</p></div>
+          <span class="data-quality exact">MotorMaxTorque</span>
+        </div>
+        <div class="table-scroll">
+          <table class="table-mini" id="axle-results-table">
+            <thead><tr><th>Módulo / eixo</th><th>Config</th><th>Rodas</th><th>Torque eixo</th><th>Torque / motriz</th><th>Freio eixo</th><th>Freio / roda</th></tr></thead>
+            <tbody><tr><td colspan="7" class="empty-table">Confirme a topologia acima.</td></tr></tbody>
+          </table>
+        </div>
+        <p class="field-note topology-footnote">Valores instantâneos de TCS, slip do diferencial, FPS, acelerador, embreagem e limitadores podem reduzir ou redistribuir o resultado dentro do Roblox. O site salva esta topologia para o cálculo, mas os mesmos atributos <code>WheelDriven</code> ainda precisam existir nas rodas do modelo no Studio.</p>
+      </div>
     </div>
 
     <!-- ══ FREIOS ══ -->
@@ -415,9 +512,9 @@
           <p class="card-title">Parâmetros</p>
           <div class="field-group">
             <div class="field"><label>BrakeForce</label><input type="number" data-tune="BrakeForce" id="bk-force" value="3000"></div>
-            <div class="field"><label>BrakeBias (% frente)</label><input type="number" data-tune="BrakeBias" id="bk-bias" value="60"></div>
+            <div class="field"><label>BrakeBias (% frente)</label><input type="number" data-tune="BrakeBias" data-tune-scale="0.01" id="bk-bias" value="60" min="0" max="100"></div>
             <div class="field"><label>PBrakeForce (mão)</label><input type="number" data-tune="PBrakeForce" id="bk-pforce" value="2000"></div>
-            <div class="field"><label>PBrakeBias (% frente)</label><input type="number" data-tune="PBrakeBias" id="bk-pbias" value="0"></div>
+            <div class="field"><label>PBrakeBias (% frente)</label><input type="number" data-tune="PBrakeBias" data-tune-scale="0.01" id="bk-pbias" value="0" min="0" max="100"></div>
             <div class="field"><label>EBrakeForce (motor)</label><input type="number" data-tune="EBrakeForce" id="bk-eforce" value="500"></div>
             <div class="field"><label>Vel. teste (<span class="spd-unit">km/h</span>)</label><input type="number" id="bk-speed" value="100"></div>
             <div class="field"><label>BrakeAccel</label><input type="number" data-tune="BrakeAccel" id="brakeaccel" value="0.15" step="0.001"></div>
@@ -461,7 +558,7 @@
             <div class="field"><label>SteeringType</label><select id="steeringtype" data-tune="SteeringType" data-tune-str><option value="New">New (LockToLock)</option><option value="Old">Old (Outer/Inner)</option></select></div>
             <div class="field"><label>LockToLock</label><input type="number" data-tune="LockToLock" id="st-locktolock" value="2.6" step="0.1"></div>
             <div class="field"><label>SteerRatio</label><input type="number" data-tune="SteerRatio" id="st-ratio" value="14" step="0.1"></div>
-            <div class="field"><label>Ackerman (%)</label><input type="number" data-tune="Ackerman" id="st-ackerman" value="100"></div>
+            <div class="field"><label>Ackerman (%)</label><input type="number" data-tune="Ackerman" data-tune-scale="0.01" id="st-ackerman" value="100" min="0" max="100"></div>
             <div class="field"><label>SteerSpeed</label><input type="number" data-tune="SteerSpeed" id="steerspeed" value="4" step="0.1"></div>
             <div class="field"><label>ReturnSpeed</label><input type="number" data-tune="ReturnSpeed" id="returnspeed" value="8" step="0.1"></div>
             <div class="field"><label>SteerDecay</label><input type="number" data-tune="SteerDecay" id="steerdecay" value="300"></div>
@@ -742,9 +839,9 @@
 </div>
 
 <!-- MODAL EXPORT -->
-<div class="modal-backdrop" id="export-modal-backdrop">
+<div class="modal-backdrop" id="export-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
   <div class="modal">
-    <div class="modal-head"><h2>TUNE EXPORTADO</h2><button id="export-modal-close">✕</button></div>
+    <div class="modal-head"><h2 id="export-modal-title">TUNE EXPORTADO</h2><button id="export-modal-close" aria-label="Fechar exportação">✕</button></div>
     <div class="modal-body"><pre id="export-output"></pre></div>
     <div class="modal-foot">
       <button class="btn btn-amber" id="export-copy-btn">Copiar código</button>
@@ -754,9 +851,9 @@
 </div>
 
 <!-- MODAL IMPORT -->
-<div class="modal-backdrop" id="import-modal-backdrop">
+<div class="modal-backdrop" id="import-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
   <div class="modal">
-    <div class="modal-head"><h2>IMPORTAR TUNE</h2><button id="import-modal-close">✕</button></div>
+    <div class="modal-head"><h2 id="import-modal-title">IMPORTAR TUNE</h2><button id="import-modal-close" aria-label="Fechar importação">✕</button></div>
     <div class="modal-body" style="overflow:hidden">
       <div class="import-area" style="margin:.9rem 1rem">
         <p class="import-hint">Cole o conteúdo do Tune.lua (linhas "Tune.XXX = valor")</p>
@@ -775,8 +872,9 @@
 </div>
 
 <!-- TOAST CONTAINER -->
-<div id="toast-container"></div>
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
+<script src="ac6-math.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

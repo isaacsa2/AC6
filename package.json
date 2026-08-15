@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
+    "test": "node tests/ac6-math.test.cjs",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
