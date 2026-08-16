@@ -18,6 +18,7 @@ assert.equal(tuneNumber('Horsepower'), 220);
 assert.equal(tuneNumber('EqPoint'), 5252);
 assert.equal(tuneNumber('T_BoostLag'), 300);
 assert.equal(tuneNumber('T2_BoostLag'), 400);
+assert.match(template, /Tune\.TurboZeroStart\s*=\s*true/);
 assert.equal(tuneNumber('FinalDrive'), 8.45);
 assert.equal(tuneNumber('BrakeBias'), 0.6);
 assert.equal(tuneNumber('Ackerman'), 0.9);
@@ -40,6 +41,7 @@ const updatedTune = {
   turboBoost: 3,
   turboLag: 300,
   turboLag2: 400,
+  turboZeroStart: true,
   superCount: 1,
   superBoost: 3,
   superSensitivity: 0.1,
@@ -88,7 +90,26 @@ const transient = AC6.pointAtRpm(6400, {
   throttle: 1,
   duration: 2
 });
-assert.ok(transient.turboMultiplier >= 0.05 && transient.turboMultiplier < 2, 'transient turbo remains below settled boost after 2s');
+assert.ok(transient.turboMultiplier > 0 && transient.turboMultiplier < 2, 'transient turbo spools from zero and remains below settled boost after 2s');
+
+const zeroPsiStart = AC6.pointAtRpm(6400, {
+  ...updatedTune,
+  scenario: 'transient',
+  duration: 0,
+  turboZeroStart: true
+});
+assert.equal(zeroPsiStart.turboMultiplier, 0, 'zero PSI mode starts turbo multiplier at zero');
+assert.equal(zeroPsiStart.turboHP, 0, 'zero PSI mode starts without turbo horsepower');
+assert.equal(zeroPsiStart.turboGaugePsi, 0, 'zero PSI mode clamps the gauge floor');
+
+const originalPsiStart = AC6.pointAtRpm(6400, {
+  ...updatedTune,
+  scenario: 'transient',
+  duration: 0,
+  turboZeroStart: false
+});
+assert.equal(originalPsiStart.turboMultiplier, 0.05, 'original AC6 mode keeps the 0.05 multiplier floor');
+assert.ok(originalPsiStart.turboGaugePsi < 0, 'original AC6 gauge can begin below zero PSI');
 
 const speed = AC6.speedMphFromRedline(6800, 1, 8.45, 1, 4);
 const expectedSpeed = (6800 / 8.45) * 2 * Math.PI / 60 * 2 * ((10 / 12) * (60 / 88));

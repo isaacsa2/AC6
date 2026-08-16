@@ -184,6 +184,7 @@ Tune.Turbochargers	= 1			-- Number of turbochargers in the engine, set to 0 for 
 Tune.T_Boost		= 3
 Tune.T_BoostLag		= 300		-- Turbo lag overall
 Tune.T2_BoostLag	= 400		-- (ONLY ACTIVE ON TWIN TURBO CARS) Second turbo lag, equal to the first turbo lag or greater if you're using sequential turbos
+Tune.TurboZeroStart	= true		-- true starts spool and displayed pressure at 0 PSI; false keeps original AC6 behavior
 
 -- Supercharger
 Tune.Superchargers	= 1				-- Number of superchargers in the engine

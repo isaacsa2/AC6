@@ -151,6 +151,11 @@
               <div class="field"><label>T_BoostLag</label><input type="number" data-tune="T_BoostLag" id="tlag" value="6"></div>
               <div class="field"><label>T2_BoostLag</label><input type="number" data-tune="T2_BoostLag" id="t2lag" value="6"></div>
             </div>
+            <div class="toggle-row turbo-floor-row">
+              <label class="toggle-label"><label class="switch"><input type="checkbox" data-tune="TurboZeroStart" data-tune-bool id="turbo-zero-start" checked><span class="slider-sw"></span></label>Curva parte de 0 PSI</label>
+              <span class="pill pill-on" id="turbo-zero-pill">ON</span>
+            </div>
+            <p class="field-note turbo-floor-note">Na resposta temporal, impede PSI negativo no início do spool. Desative para reproduzir o piso original de 0,05 do AC6.</p>
           </div>
           <div class="card">
             <p class="card-title">Supercharger</p>
