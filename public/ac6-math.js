@@ -92,7 +92,7 @@
     const steps = Math.max(0, Math.round(Math.max(0, config.duration) / dt));
     const throttle = clamp(finite(config.throttle, 1), 0, 1);
     const turboPsi = config.turboBoost * config.turboCount;
-    const turboFloorMultiplier = config.turboZeroStart ? 0 : 0.05;
+    const turboFloorMultiplier = config.turboCurveZeroStart ? 0 : 0.05;
     let turboMultiplier = config.turboCount > 0 ? turboFloorMultiplier : 0;
     let superThrottle = 0;
     let filteredThrottle = 0;
@@ -144,7 +144,7 @@
       eRedline: 1, eTrans1: 1, eTrans2: 1, eHorsepower: 0,
       ehFrontMult: 1, ehEndMult: 1, ehEndPercent: 0, eTorque: 0,
       etEndMult: 1, etEndPercent: 0, ratio: 1, finalDrive: 1, fdMult: 1,
-      scenario: 'settled', throttle: 1, duration: 2, turboZeroStart: false
+      scenario: 'settled', throttle: 1, duration: 2, turboCurveZeroStart: false
     }, input || {});
     const safeRPM = Math.max(0, finite(rpm, 0));
     const turboNominal = boostHorsepower(config.horsepower, config.turboBoost, config.turboCount, config.compressionRatio);
@@ -157,10 +157,6 @@
     };
     const aspiration = simulateAspiration(safeRPM, config, base);
     const turboHP = base.turboCurveHP * (aspiration.turboMultiplier / 2);
-    const turboTotalPsi = Math.max(0, finite(config.turboBoost, 0) * finite(config.turboCount, 0));
-    const turboPressurePsi = (aspiration.turboMultiplier / 2) * turboTotalPsi;
-    const legacyGaugePsi = Math.floor((Math.floor(turboPressurePsi) * 1.2) - (turboTotalPsi / 5));
-    const turboGaugePsi = config.turboZeroStart ? Math.max(0, legacyGaugePsi) : legacyGaugePsi;
     const superHP = base.superCurveHP * aspiration.superMultiplier;
     const combustionHP = base.naHP + turboHP + superHP;
     const totalHP = combustionHP + base.electricHP;
@@ -183,8 +179,6 @@
       engineTorque,
       wheelTorque: engineTorque * driveMultiplier,
       turboMultiplier: aspiration.turboMultiplier,
-      turboPressurePsi,
-      turboGaugePsi,
       superMultiplier: aspiration.superMultiplier,
       superThrottle: aspiration.settledThrottle
     };

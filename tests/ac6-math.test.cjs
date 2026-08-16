@@ -18,7 +18,7 @@ assert.equal(tuneNumber('Horsepower'), 220);
 assert.equal(tuneNumber('EqPoint'), 5252);
 assert.equal(tuneNumber('T_BoostLag'), 300);
 assert.equal(tuneNumber('T2_BoostLag'), 400);
-assert.match(template, /Tune\.TurboZeroStart\s*=\s*true/);
+assert.doesNotMatch(template, /Tune\.TurboZeroStart/);
 assert.equal(tuneNumber('FinalDrive'), 8.45);
 assert.equal(tuneNumber('BrakeBias'), 0.6);
 assert.equal(tuneNumber('Ackerman'), 0.9);
@@ -27,6 +27,7 @@ const html = fs.readFileSync(require.resolve('../public/index.html'), 'utf8');
 assert.match(html, /data-tune="BrakeBias" data-tune-scale="0\.01"/);
 assert.match(html, /data-tune="PBrakeBias" data-tune-scale="0\.01"/);
 assert.match(html, /data-tune="Ackerman" data-tune-scale="0\.01"/);
+assert.match(html, /id="turbo-zero-curve-btn"/);
 const updatedTune = {
   engine: true,
   electric: false,
@@ -41,7 +42,7 @@ const updatedTune = {
   turboBoost: 3,
   turboLag: 300,
   turboLag2: 400,
-  turboZeroStart: true,
+  turboCurveZeroStart: true,
   superCount: 1,
   superBoost: 3,
   superSensitivity: 0.1,
@@ -96,20 +97,18 @@ const zeroPsiStart = AC6.pointAtRpm(6400, {
   ...updatedTune,
   scenario: 'transient',
   duration: 0,
-  turboZeroStart: true
+  turboCurveZeroStart: true
 });
-assert.equal(zeroPsiStart.turboMultiplier, 0, 'zero PSI mode starts turbo multiplier at zero');
-assert.equal(zeroPsiStart.turboHP, 0, 'zero PSI mode starts without turbo horsepower');
-assert.equal(zeroPsiStart.turboGaugePsi, 0, 'zero PSI mode clamps the gauge floor');
+assert.equal(zeroPsiStart.turboMultiplier, 0, 'button mode starts turbo multiplier at zero');
+assert.equal(zeroPsiStart.turboHP, 0, 'button mode starts without turbo horsepower');
 
 const originalPsiStart = AC6.pointAtRpm(6400, {
   ...updatedTune,
   scenario: 'transient',
   duration: 0,
-  turboZeroStart: false
+  turboCurveZeroStart: false
 });
 assert.equal(originalPsiStart.turboMultiplier, 0.05, 'original AC6 mode keeps the 0.05 multiplier floor');
-assert.ok(originalPsiStart.turboGaugePsi < 0, 'original AC6 gauge can begin below zero PSI');
 
 const speed = AC6.speedMphFromRedline(6800, 1, 8.45, 1, 4);
 const expectedSpeed = (6800 / 8.45) * 2 * Math.PI / 60 * 2 * ((10 / 12) * (60 / 88));

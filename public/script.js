@@ -6,6 +6,7 @@ const IS_BYINSPARE = CHASSIS_VARIANT.toLowerCase() === 'byinspare';
 const STORAGE_KEY = IS_BYINSPARE ? 'ac6_byinspare_saved_tune' : 'ac6c_saved_tune';
 const AC6_SUS_STIFFNESS_SCALE = 0.38;
 let chassisTemplateSource = '';
+let TURBO_CURVE_ZERO_PSI = false;
 
 function hideElement(el) {
   if(el) el.style.display = 'none';
@@ -296,7 +297,7 @@ function getAc6Config(overrides = {}) {
     compressionRatio: v('cr'),
     turboCount: chk('turbo-en') ? Math.max(0, v('tcount')) : 0,
     turboBoost: chk('turbo-en') ? Math.max(0, v('tboost')) : 0,
-    turboZeroStart: chk('turbo-zero-start'),
+    turboCurveZeroStart: TURBO_CURVE_ZERO_PSI,
     turboLag: Math.max(0.0001, v('tlag')),
     turboLag2: Math.max(0.0001, v('t2lag') || v('tlag')),
     superCount: chk('super-en') ? Math.max(0, v('scount')) : 0,
@@ -359,7 +360,7 @@ function calcHP() {
   document.getElementById('r-na').textContent = Math.round(peakNA.naHP);
   document.getElementById('r-turbo').textContent = '+' + Math.round(peakTurbo.turboHP);
   document.getElementById('r-turbo-sub').textContent = config.turboCount > 0
-    ? config.turboCount + '× @ ' + config.turboBoost + ' PSI · ' + Math.round(peakTurbo.rpm) + ' RPM · ' + (config.turboZeroStart ? 'piso 0 PSI' : 'AC6 original')
+    ? config.turboCount + '× @ ' + config.turboBoost + ' PSI · ' + Math.round(peakTurbo.rpm) + ' RPM' + (config.turboCurveZeroStart ? ' · recalculada desde 0 PSI' : '')
     : 'desativado';
   document.getElementById('r-super').textContent = '+' + Math.round(peakSuper.superHP);
   document.getElementById('r-super-sub').textContent = config.superCount > 0
@@ -1026,23 +1027,47 @@ document.querySelectorAll('input, select').forEach(el => {
 });
 let fitTorqueValuesBtn = document.getElementById('fit-torque-values-btn');
 if(fitTorqueValuesBtn) fitTorqueValuesBtn.addEventListener('click', fitTuneValuesToAutoDyno);
+
+function syncTurboCurveButton() {
+  const button = document.getElementById('turbo-zero-curve-btn');
+  const status = document.getElementById('turbo-zero-curve-status');
+  if(!button || !status) return;
+  button.classList.toggle('active', TURBO_CURVE_ZERO_PSI);
+  button.setAttribute('aria-pressed', String(TURBO_CURVE_ZERO_PSI));
+  button.textContent = TURBO_CURVE_ZERO_PSI
+    ? 'Voltar ao cálculo AC6 original'
+    : 'Recalcular curva a partir de 0 PSI';
+  status.textContent = TURBO_CURVE_ZERO_PSI
+    ? 'Curva recalculada: spool iniciado exatamente em 0 PSI.'
+    : 'Cálculo atual: AC6 original.';
+}
+const turboZeroCurveBtn = document.getElementById('turbo-zero-curve-btn');
+if(turboZeroCurveBtn) {
+  turboZeroCurveBtn.addEventListener('click', () => {
+    TURBO_CURVE_ZERO_PSI = !TURBO_CURVE_ZERO_PSI;
+    const dynoMode = document.getElementById('dyno-mode');
+    if(dynoMode) dynoMode.value = TURBO_CURVE_ZERO_PSI ? 'transient' : 'settled';
+    syncTurboCurveButton();
+    calcCore();
+    showToast(TURBO_CURVE_ZERO_PSI ? 'Motor recalculado com o turbo partindo de 0 PSI.' : 'Cálculo original do AC6 restaurado.', 'success');
+  });
+}
+syncTurboCurveButton();
 bindAxleTopologyEditor();
 calcCore();
 
 /* Toggle Pills */
-function syncTogglePill(cbId, pillId) {
-  const cb = document.getElementById(cbId);
-  const pill = document.getElementById(pillId);
-  if(!cb || !pill) return;
-  pill.textContent = cb.checked ? 'ON' : 'OFF';
-  pill.className = 'pill ' + (cb.checked ? 'pill-on' : 'pill-off');
-}
 function bindToggle(cbId, pillId) {
-  const cb = document.getElementById(cbId);
+  let cb = document.getElementById(cbId);
   if(!cb) return;
-  cb.addEventListener('change', () => syncTogglePill(cbId, pillId));
+  cb.addEventListener('change', function() {
+    if(pillId) {
+      let p = document.getElementById(pillId);
+      if(p) { p.textContent = this.checked ? 'ON' : 'OFF'; p.className = 'pill ' + (this.checked ? 'pill-on' : 'pill-off'); }
+    }
+  });
 }
-bindToggle('turbo-en','turbo-pill'); bindToggle('turbo-zero-start','turbo-zero-pill'); bindToggle('super-en','super-pill'); bindToggle('engine-en','engine-pill');
+bindToggle('turbo-en','turbo-pill'); bindToggle('super-en','super-pill'); bindToggle('engine-en','engine-pill');
 bindToggle('torque-smooth-en','torque-smooth-pill');
 bindToggle('speed-fit-en','speed-fit-pill');
 bindToggle('clutch-en','clutch-pill'); bindToggle('abs-en','abs-pill'); bindToggle('tcs-en','tcs-pill');
@@ -1411,7 +1436,7 @@ function buildLuaIsaacsa2() {
   
   t+='--[[Engine]]\n'+L('Engine')+L('Horsepower')+L('IdleRPM')+L('PeakRPM')+L('Redline')+L('PeakSharpness')+L('CurveMult')+L('EqPoint')+'\n'+L('CompressionRatio')+'\n';
   t+='-- Electric Engine\n'+L('Electric')+L('E_Redline')+L('E_Trans1')+L('E_Trans2')+'-- Horsepower\n'+L('E_Horsepower')+L('EH_FrontMult')+L('EH_EndMult')+L('EH_EndPercent')+'-- Torque\n'+L('E_Torque')+L('ET_EndMult')+L('ET_EndPercent')+'\n';
-  t+='-- Turbocharger\n'+L('Turbochargers')+L('T_Boost')+L('T_BoostLag')+L('T2_BoostLag')+L('TurboZeroStart')+'\n';
+  t+='-- Turbocharger\n'+L('Turbochargers')+L('T_Boost')+L('T_BoostLag')+L('T2_BoostLag')+'\n';
   t+='-- Supercharger\n'+L('Superchargers')+L('S_Boost')+L('S_Sensitivity')+'\n--Misc\n'+L('ThrotAccel')+L('ThrotDecel')+'\nTune.BrakeAccel\t\t\t= '+luaN(v('brakeaccel'))+'\nTune.BrakeDecel\t\t\t= '+luaN(v('brakedecel'))+'\n\n'+L('RevAccel')+L('RevDecay')+L('RevBounce')+'\n'+L('IdleThrottle')+L('Flywheel')+'\n'+L('InclineComp')+'\n';
   
   t+='--[[Drivetrain]]\n'+L('Config')+L('TorqueVector')+'\n-- Differential Settings\n'+L('DifferentialType')+'\n-- Old Options\n'+L('FDiffSlipThres')+L('FDiffLockThres')+L('RDiffSlipThres')+L('RDiffLockThres')+L('CDiffSlipThres')+L('CDiffLockThres')+'\n-- New Options\n'+L('FDiffPower')+L('FDiffCoast')+L('FDiffPreload')+L('RDiffPower')+L('RDiffCoast')+L('RDiffPreload')+'\n-- Traction Control\n'+L('TCSEnabled')+L('TCSThreshold')+'Tune.TCSGradient\t\t= 10\n'+L('TCSLimit')+'\n';
@@ -1493,7 +1518,7 @@ document.getElementById('import-file-input').addEventListener('change', e => {
 });
 
 const KM={'Horsepower':'hp','PeakRPM':'peakrpm','Redline':'redline','CompressionRatio':'cr','IdleRPM':'idlerpm','IdleThrottle':'idlethrot','RevAccel':'revaccel','RevDecay':'revdecay','RevBounce':'revbounce','Flywheel':'flywheel','PeakSharpness':'sharp','CurveMult':'curvemult','ThrotAccel':'throtaccel','ThrotDecel':'throtdecel','InclineComp':'inclinecomp','EqPoint':'eqpoint','Turbochargers':'tcount','T_Boost':'tboost','T_BoostLag':'tlag','T2_BoostLag':'t2lag','Superchargers':'scount','S_Boost':'sboost','S_Sensitivity':'ssens','ShiftUpTime':'shiftuptime','ShiftDnTime':'shiftdntime','ShiftThrot':'shiftthrot','AutoUpThresh':'autoupthresh','AutoDownThresh':'autodownthresh','ClutchEngage':'clutchengage','ClutchRPMMult':'clutchrpmmult','SpeedEngage':'speedengage','RPMEngage':'rpmengage','KickMult':'kickmult','KickSpeedThreshold':'kickspeed','KickRPMThreshold':'kickrpm','TorqueVector':'torquevector','FDiffPower':'fdiffpower','FDiffCoast':'fdiffcoast','FDiffPreload':'fdiffpreload','FDiffSlipThres':'fdiffslip','FDiffLockThres':'fdifflock','RDiffPower':'rdiffpower','RDiffCoast':'rdiffcoast','RDiffPreload':'rdiffpreload','RDiffSlipThres':'rdiffslip','RDiffLockThres':'rdifflock','CDiffSlipThres':'cdiffslip','CDiffLockThres':'cdifflock','Weight':'weight','WeightDist':'wdist','CGHeight':'cgh','FWheelDensity':'fwd','RWheelDensity':'rwd','AxleDensity':'axd','FSusStiffness':'fstiff','FSusDamping':'fdamp','FSusLength':'flen','FPreCompress':'fprecomp','FExtensionLim':'fext','FCompressLim':'fcomp','RSusStiffness':'rstiff','RSusDamping':'rdamp','RSusLength':'rlen','RPreCompress':'rprecomp','RExtensionLim':'rext','RCompressLim':'rcomp','FinalDrive':'dt-finaldrive','FDMult':'dt-fdmult','BrakeForce':'bk-force','BrakeBias':'bk-bias','PBrakeForce':'bk-pforce','PBrakeBias':'bk-pbias','EBrakeForce':'bk-eforce','BrakeAccel':'brakeaccel','BrakeDecel':'brakedecel','ABSThreshold':'absthreshold','TCSThreshold':'tcsthreshold','TCSLimit':'tcslimit','LockToLock':'st-locktolock','SteerRatio':'st-ratio','Ackerman':'st-ackerman','SteerSpeed':'steerspeed','ReturnSpeed':'returnspeed','SteerDecay':'steerdecay','MinSteer':'minsteer','RSteerOuter':'rsteer-outer','RSteerInner':'rsteer-inner','RSteerSpeed':'rsteer-speed','RSteerDecay':'rsteer-decay','E_Redline':'e-redline','E_Trans1':'e-trans1','E_Trans2':'e-trans2','E_Horsepower':'e-hp','EH_FrontMult':'e-hfrontmult','EH_EndMult':'e-hendmult','EH_EndPercent':'e-hendpct','E_Torque':'e-tq','ET_EndMult':'e-tqendmult','ET_EndPercent':'e-tqendpct','LoadDelay':'loaddelay','NeutralRevRPM':'neutralrevrpm','FCamber':'fcamber','RCamber':'rcamber','FCaster':'fcaster','RCaster':'rcaster','FToe':'ftoe','RToe':'rtoe'};
-const KB={'Engine':'engine-en','TurboZeroStart':'turbo-zero-start','ABSEnabled':'abs-en','TCSEnabled':'tcs-en','Clutch':'clutch-en','Stall':'stall-en','ClutchKick':'ck-en','Electric':'elec-en','AutoFlip':'autoflip-en','AutoStart':'autostart-en','NeutralLimit':'neutrallimit-en','LimitClutch':'limitclutch-en'};
+const KB={'Engine':'engine-en','ABSEnabled':'abs-en','TCSEnabled':'tcs-en','Clutch':'clutch-en','Stall':'stall-en','ClutchKick':'ck-en','Electric':'elec-en','AutoFlip':'autoflip-en','AutoStart':'autostart-en','NeutralLimit':'neutrallimit-en','LimitClutch':'limitclutch-en'};
 const KS={'AutoShiftType':'autoshifttype','AutoShiftVers':'autoshiftvers','AutoShiftMode':'autoshiftmode','ClutchType':'clutchtype','ClutchMode':'clutchmode','DifferentialType':'difftype','Config':'diffconfig','SteeringType':'steeringtype','FWSteer':'fwsteer'};
 
 function decodeXmlEntities(text) {
@@ -1583,7 +1608,6 @@ function applyTuneTextToForm(txt) {
     }
   });
 
-  syncTogglePill('turbo-zero-start', 'turbo-zero-pill');
   calc();
   return applied;
 }
@@ -1677,7 +1701,6 @@ function setFormValues(data) {
       else el.value = data[id];
     }
   });
-  syncTogglePill('turbo-zero-start', 'turbo-zero-pill');
   loadAxleTopologyFromHidden();
   calcCore();
 }

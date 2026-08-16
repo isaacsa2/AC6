@@ -325,8 +325,8 @@ body {
 .precision-copy p { margin-top: .25rem; color: var(--text2); font-size: .68rem; line-height: 1.45; }
 .precision-controls { display: grid; grid-template-columns: 1.25fr repeat(3, minmax(90px, 1fr)); gap: .65rem; }
 .precision-controls .field label { color: #cbd5e1; }
-.turbo-floor-row { margin-top: .8rem; padding-top: .7rem; border-top: 1px solid var(--border); }
-.turbo-floor-note { margin-top: .45rem; line-height: 1.45; }
+.turbo-curve-action { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-top: .8rem; padding-top: .7rem; border-top: 1px solid var(--border); }
+#turbo-zero-curve-btn.active { border-color: rgba(16,185,129,.5); background: rgba(16,185,129,.12); color: #6ee7b7; }
 .field input:disabled {
   color: var(--text3);
   cursor: not-allowed;
